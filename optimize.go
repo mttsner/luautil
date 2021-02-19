@@ -21,13 +21,33 @@ type scope struct {
 	Locals locals
 	Data map[string]ast.Expr
 	LocalCount int
+	Functions *functions
 }
 
-func getString(expr *ast.Expr) (str string, success bool) {
-	if str, ok := (*expr).(*ast.StringExpr); ok {
-		return str.Value, ok
+func getString(expr *ast.Expr) (String string, Success bool) {
+	switch ex := (*expr).(type) {
+	case *ast.StringExpr:
+		return ex.Value, true
+	case *ast.NumberExpr:
+		return ex.Value, true
 	}
 	return 
+}
+
+func getBool(expr *ast.Expr) (Bool bool, Success bool, expression ast.Expr) {
+	switch ex := (*expr).(type) {
+	case *ast.TrueExpr:
+		return true, true, &ast.TrueExpr{}
+	case *ast.FalseExpr:
+		return false, true, &ast.FalseExpr{}
+	case *ast.StringExpr:
+		return true, true, ex
+	case *ast.IdentExpr:
+		if ex.Value == "getfenv" {
+			return true, true, ex
+		}
+	}
+	return false, false, nil
 }
 
 func concat(left *ast.Expr, right *ast.Expr) ast.Expr {
@@ -101,11 +121,42 @@ func arithmetic(op string, left *ast.Expr, right *ast.Expr) ast.Expr {
 		case "^":
 			result = math.Pow(lv, rv)
 		}
-		if math.IsNaN(result) || math.IsInf(result, 0) {
-			return nil
-		} else {
+		if !math.IsNaN(result) || !math.IsInf(result, 0) {
 			return &ast.NumberExpr{Value: stringify(result)}
 		}
+	}
+	return nil
+}
+
+func (s *scope) logical(expr *ast.LogicalOpExpr) ast.Expr {
+	l, okl, retl := getBool(&expr.Lhs)
+	r, okr, retr := getBool(&expr.Rhs)
+	switch expr.Operator {
+	case "and":
+		if !okl {
+			return nil
+		}
+		if !l {
+			return retl
+		}
+		if !okr {
+			return nil
+		}
+		if r {
+			return retr
+		}
+		return &ast.FalseExpr{}
+	case "or":
+		if okl && l {
+			return retl
+		}
+		if !okr {
+			return nil
+		}
+		if r {
+			return retr
+		}
+		return &ast.FalseExpr{}
 	}
 	return nil
 }
@@ -120,12 +171,31 @@ func (s *scope) newScope() func() {
 	}
 }
 
-func (s *scope) call(expr *ast.FuncCallExpr) {
-	if ex, ok := expr.Func.(*ast.FunctionExpr); ok {
-		for i, name := range ex.ParList.Names {
+func isFoldable(function *ast.FunctionExpr) bool {
+	if len(function.Stmts) == 1 {
+		switch function.Stmts[0].(type) {
+		case *ast.ReturnStmt:
+			return true	
+		}
+	}
+	return true
+}
+
+
+func (s *scope) call(expr *ast.FuncCallExpr) ast.Expr {
+	if function, ok := expr.Func.(*ast.FunctionExpr); ok {
+
+
+		if len(function.Stmts) == 1 {
+			if ret, ok := function.Stmts[0].(*ast.ReturnStmt); ok && len(ret.Exprs) == 1 {
+				return *s.Functions.compileExpr(&ret.Exprs[0])
+			}
+		}
+		for i, name := range function.ParList.Names {
 			s.Data[name] = expr.Args[i]
 		}
 	}
+	return nil
 }
 
 func getValueOfIndex(index string, table *ast.TableExpr) ast.Expr {
@@ -145,8 +215,9 @@ func getValueOfIndex(index string, table *ast.TableExpr) ast.Expr {
 }
 
 func (s *scope) index(expr *ast.AttrGetExpr) ast.Expr {
-	if ident, ok := expr.Object.(*ast.IdentExpr); ok {
-		if data, ok := s.Data[ident.Value]; ok {
+	switch ex := expr.Object.(type) {
+	case *ast.IdentExpr:
+		if data, ok := s.Data[ex.Value]; ok {
 			if tbl, ok := data.(*ast.TableExpr); ok {
 				switch key := expr.Key.(type) {
 				case *ast.StringExpr:
@@ -155,6 +226,13 @@ func (s *scope) index(expr *ast.AttrGetExpr) ast.Expr {
 					return getValueOfIndex(key.Value, tbl)
 				}
 			}
+		}
+	case *ast.TableExpr:
+		switch key := expr.Key.(type) {
+		case *ast.StringExpr:
+			return getValueOfIndex(key.Value, ex)
+		case *ast.NumberExpr:
+			return getValueOfIndex(key.Value, ex)
 		}
 	}
 	return nil
@@ -231,6 +309,8 @@ func Optimize(Ast []ast.Stmt) {
 		FuncCallExpr: s.call,
 		AttrGetExpr: s.index,
 		LocalAssignStmt: s.local,
+		LogicalOpExpr: s.logical,
 	}
+	s.Functions = f
 	f.Traverse(Ast)
 }
