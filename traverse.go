@@ -20,13 +20,13 @@ type functions struct {
 	UnaryNotOpExpr func(expr *ast.UnaryNotOpExpr) ast.Expr
 	UnaryLenOpExpr func(expr *ast.UnaryLenOpExpr) ast.Expr
 	//
-	FuncCallExpr func(expr *ast.FuncCallExpr)
+	FuncCallExpr func(expr *ast.FuncCallExpr) ast.Expr
 	AttrGetExpr func(expr *ast.AttrGetExpr) ast.Expr
 	//
 	StringConcatOpExpr func(left *ast.Expr, right *ast.Expr) ast.Expr
-	RelationalOpExpr func(operator string, left *ast.Expr, right *ast.Expr) *ast.Expr
+	RelationalOpExpr func(expr *ast.RelationalOpExpr) *ast.Expr
 	ArithmeticOpExpr func(operator string, left *ast.Expr, right *ast.Expr) ast.Expr
-	LogicalOpExpr func(operator string, left *ast.Expr, right *ast.Expr) *ast.Expr
+	LogicalOpExpr func(*ast.LogicalOpExpr) ast.Expr
 	//
 	WhileStmt func(stmt *ast.WhileStmt)
 	RepeatStmt func(stmt *ast.RepeatStmt)
@@ -83,7 +83,7 @@ func (Functions *functions) compileRelationalOpExpr(expr *ast.RelationalOpExpr, 
 	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
 	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
 	if Functions.RelationalOpExpr != nil {
-		if ex := Functions.RelationalOpExpr(expr.Operator, &expr.Lhs, &expr.Rhs); ex != nil {
+		if ex := Functions.RelationalOpExpr(expr); ex != nil {
 			return ex
 		}
 	}
@@ -116,8 +116,8 @@ func (Functions *functions) compileLogicalOpExpr(expr *ast.LogicalOpExpr, ret *a
 	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
 	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
 	if Functions.LogicalOpExpr != nil {
-		if ex := Functions.LogicalOpExpr(expr.Operator, &expr.Lhs, &expr.Rhs); ex != nil {
-			return ex
+		if ex := Functions.LogicalOpExpr(expr); ex != nil {
+			return &ex
 		}
 	}
 	return ret
@@ -137,18 +137,21 @@ func (Functions *functions) compileFunctionExpr(expr *ast.FunctionExpr) {
 	endScope()
 }
 
-func (Functions *functions) compileFuncCallExpr(expr *ast.FuncCallExpr) {
+func (Functions *functions) compileFuncCallExpr(expr *ast.FuncCallExpr, ret *ast.Expr) *ast.Expr {
 	for i, arg := range expr.Args {
 		expr.Args[i] = *Functions.compileExpr(&arg)
 	}
 	if Functions.FuncCallExpr != nil {
-		Functions.FuncCallExpr(expr)
+		if ex := Functions.FuncCallExpr(expr); ex != nil {
+			return &ex
+		}
 	}
 	if expr.Func != nil { // hoge.func()
 		expr.Func = *Functions.compileExpr(&expr.Func)
 	} else { // hoge:method()
 		expr.Receiver = *Functions.compileExpr(&expr.Receiver)
 	}
+	return ret
 }
 
 func (Functions *functions) compileIdentExpr(expr *ast.IdentExpr, ret *ast.Expr) *ast.Expr {
@@ -177,9 +180,7 @@ func (Functions *functions) compileExpr(expr *ast.Expr) *ast.Expr {
 	case *ast.StringExpr:
 
 	case *ast.NumberExpr:
-
-	case *constLValueExpr:
-
+		
 	case *ast.NilExpr:
 
 	case *ast.FalseExpr:
@@ -205,7 +206,7 @@ func (Functions *functions) compileExpr(expr *ast.Expr) *ast.Expr {
 	case *ast.LogicalOpExpr:
 		return Functions.compileLogicalOpExpr(ex, expr)
 	case *ast.FuncCallExpr:
-		Functions.compileFuncCallExpr(ex)
+		return Functions.compileFuncCallExpr(ex, expr)
 	case *ast.FunctionExpr:
 		Functions.compileFunctionExpr(ex)
 	}
@@ -411,7 +412,7 @@ func (Functions *functions) compileBreakStmt() {
 }
 
 func (Functions *functions) compileFuncCallStmt(stmt *ast.FuncCallStmt) {
-	Functions.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr))
+	Functions.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr), nil)
 	if Functions.FuncCallStmt != nil {
 		Functions.FuncCallStmt(stmt.Expr.(*ast.FuncCallExpr))
 	}
