@@ -8,6 +8,7 @@ import (
 type state struct {
 	Pattern []ast.Stmt
 	Exprs []ast.Expr
+	Stmts []ast.Stmt
 	Exit bool
 }
 
@@ -151,6 +152,9 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 				}
 				return true
 			}
+		} else if custom, ok := selector.(*ast.IdentExpr); ok && custom.Value == "_FunctionExpr_" {
+			s.Exprs = append(s.Exprs, ex)
+			return true
 		}
 	}
 	return false
@@ -289,6 +293,13 @@ func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
 		case *ast.IfStmt:
 			if result, ok := cStmt.(*ast.IfStmt); ok && s.ifEqual(stmt, result) {
 				break
+			} else if custom, ok := cStmt.(*ast.FuncCallStmt); ok {
+				if expr, ok := custom.Expr.(*ast.FuncCallExpr); ok {
+					if ident, ok := expr.Func.(*ast.IdentExpr); ok && ident.Value == "_IfStmt_" {
+						s.Stmts = append(s.Stmts, stmt)
+						break
+					}
+				}
 			}
 			return false
 		case *ast.BreakStmt:
@@ -458,7 +469,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 }
 
 // Match pattern in ast.
-func Match(chunk []ast.Stmt, pattern []ast.Stmt) (bool, []ast.Expr) {
+func Match(chunk []ast.Stmt, pattern []ast.Stmt) (bool, []ast.Expr, []ast.Stmt) {
 	st := state{Pattern: pattern}
-	return st.match(chunk), st.Exprs
+	return st.match(chunk), st.Exprs, st.Stmts
 }
