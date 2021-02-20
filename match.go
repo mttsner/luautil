@@ -143,7 +143,7 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 			s.stmtsEqual(ex.Stmts, f.Stmts) {
 				for i, name := range f.ParList.Names {
 					if name == "_IdentExpr_" {
-						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.Parlist.Name[i])
+						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.ParList.Name[i])
 					}
 				}
 				return true
