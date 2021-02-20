@@ -141,9 +141,9 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 			if ex.ParList.HasVargs == f.ParList.HasVargs && 
 			len(ex.ParList.Names) == len(f.ParList.Names) && 
 			s.stmtsEqual(ex.Stmts, f.Stmts) {
-				for _, name := range f.ParList.Names {
+				for i, name := range f.ParList.Names {
 					if name == "_IdentExpr_" {
-						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: name})
+						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.Parlist.Name[i])
 					}
 				}
 				return true
