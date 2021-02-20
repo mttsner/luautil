@@ -13,7 +13,7 @@ local function Wrap(Chunk, _IdentExpr_, Env)
 	local Instr = Chunk[1];
 	local Proto = Chunk[2];
 	local Params = Chunk[_NumberExpr_];
-
+	if true then end
 	return function(...)
 
 	end
@@ -25,7 +25,7 @@ local function Wrap(Chunk, _IdentExpr_, Env)
 	local Instr = Chunk[1];
 	local Proto = Chunk[2];
 	local Params = Chunk[_NumberExpr_];
-
+	_IfStmt_()
 	return function(...)
 
 	end
@@ -43,9 +43,9 @@ func TestMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	success, exprs := Match(target, pattern)
-	t.Log(exprs)
-	if !success {
+	success, exprs, stmts := Match(target, pattern)
+	t.Log(exprs, stmts)
+	if success {
 		t.Error(success)
 	}
 }
