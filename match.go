@@ -60,6 +60,9 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 	case *ast.StringExpr:
 		if _, ok := selector.(*ast.StringExpr); ok {
 			return true
+		} else if custom, ok := selector.(*ast.IdentExpr); ok && custom.Value == "_StringExpr_" {
+			s.Exprs = append(s.Exprs, ex)
+			return true
 		}
 	case *ast.NumberExpr:
 		if _, ok := selector.(*ast.NumberExpr); ok {
@@ -143,7 +146,7 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 			s.stmtsEqual(ex.Stmts, f.Stmts) {
 				for i, name := range f.ParList.Names {
 					if name == "_IdentExpr_" {
-						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.ParList.Name[i])
+						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.ParList.Names[i]})
 					}
 				}
 				return true
