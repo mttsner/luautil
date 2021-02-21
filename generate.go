@@ -52,7 +52,10 @@ type data struct {
 
 //GenerateHash generates a tree pattern
 func GenerateHash(chunk []ast.Stmt, variables []string) string {
-	s := &data{Hash: new(bytes.Buffer)}
+	s := &data{
+		Hash: new(bytes.Buffer),
+		Variables: make(map[string]byte),
+	}
 	for i, str := range variables {
 		s.Variables[str] = last + byte(i)
 	}
