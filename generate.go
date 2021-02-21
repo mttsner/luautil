@@ -22,7 +22,8 @@ const (
 	localAssignStmt
 	// Expr
 	stringExpr
-	numberExpr
+	// NumberExpr value
+	NumberExpr
 	valueExpr
 	nilExpr
 	falseExpr
@@ -63,6 +64,22 @@ func GenerateHash(chunk []ast.Stmt, variables []string) string {
 	return s.Hash.String()
 }
 
+//GenerateHash generates a tree pattern
+func GenerateHashWithReplace(chunk []ast.Stmt, variables []string, replace map[string]byte) string {
+	s := &data{
+		Hash: new(bytes.Buffer),
+		Variables: make(map[string]byte),
+	}
+	for i, str := range variables {
+		s.Variables[str] = last + byte(i)
+	}
+	for str, b := range replace {
+		s.Variables[str] = b
+	}
+	s.traverseStmts(chunk)
+	return s.Hash.String()
+}
+
 func (s *data) traverseExprs(exprs []ast.Expr) {
 	for _, ex := range exprs {
 		s.traverseExpr(ex)
@@ -74,7 +91,7 @@ func (s *data) traverseExpr(expr ast.Expr) {
 	case *ast.StringExpr:
 		s.Hash.WriteByte(stringExpr)
 	case *ast.NumberExpr:
-		s.Hash.WriteByte(numberExpr)
+		s.Hash.WriteByte(NumberExpr)
 	case *ast.NilExpr:
 		s.Hash.WriteByte(nilExpr)
 	case *ast.FalseExpr:
