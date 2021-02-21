@@ -42,30 +42,31 @@ const (
 	functionExpr
 	// Special stuff
 	varArg
+	last
 )
 
-type state struct {
+type data struct {
 	Hash *bytes.Buffer
 	Variables map[string]byte
 }
 
 //GenerateHash generates a tree pattern
-func GenerateHash(chunk []ast.Stmt, variables map[string]byte) string {
-	s := &state{
-		Hash: new(bytes.Buffer),
-		Variables: variables,
+func GenerateHash(chunk []ast.Stmt, variables []string) string {
+	s := &data{Hash: new(bytes.Buffer)}
+	for i, str := range variables {
+		s.Variables[str] = last + byte(i)
 	}
 	s.traverseStmts(chunk)
 	return s.Hash.String()
 }
 
-func (s *state) traverseExprs(exprs []ast.Expr) {
+func (s *data) traverseExprs(exprs []ast.Expr) {
 	for _, ex := range exprs {
 		s.traverseExpr(ex)
 	}
 }
 
-func (s *state) traverseExpr(expr ast.Expr) {
+func (s *data) traverseExpr(expr ast.Expr) {
 	switch ex := expr.(type) {
 	case *ast.StringExpr:
 		s.Hash.WriteByte(stringExpr)
@@ -145,7 +146,7 @@ func (s *state) traverseExpr(expr ast.Expr) {
 	}
 }
 
-func (s *state) traverseStmts(chunk []ast.Stmt) {
+func (s *data) traverseStmts(chunk []ast.Stmt) {
 	for _, st := range chunk {
 		switch stmt := st.(type) {
 		case *ast.AssignStmt:
