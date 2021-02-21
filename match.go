@@ -257,6 +257,11 @@ func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
 			return false
 		case *ast.LocalAssignStmt:
 			if result, ok := cStmt.(*ast.LocalAssignStmt); ok && s.localAssignEqual(stmt, result) {
+				for i, name := range result.Names {
+					if name == "_IdentExpr_" {
+						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: result.Names[i]})
+					}
+				}
 				break
 			}
 			return false
