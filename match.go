@@ -226,7 +226,6 @@ func (s *state) ifEqual(first *ast.IfStmt, second *ast.IfStmt) bool {
 
 func (s *state) numberForEqual(first *ast.NumberForStmt, second *ast.NumberForStmt) bool {
 	return first.Step == second.Step &&
-		len(first.Name) == len(second.Name) &&
 		s.stmtsEqual(first.Stmts, second.Stmts)
 }
 
