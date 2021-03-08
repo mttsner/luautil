@@ -7,52 +7,45 @@ import (
 	"github.com/yuin/gopher-lua/ast"
 )
 
-const unaryPrecedence = 8
-const left = false
-const right = true
-
-var PRECEDENCE = map[string]int{
-	"or":  1,
-	"and": 2,
-	"<":   3, ">": 3, "<=": 3, ">=": 3, "~=": 3, "==": 3,
-	"..": 5,
-	"+":  6, "-": 6, // binary -
-	"*": 7, "/": 7, "%": 7,
-	"unarynot": 8, "unary#": 8, "unary-": 8, // unary -
-	"^": 10,
+type data struct {
+	Precedence int
+	Direction  bool // true: right, false: left
+	Parent     string
 }
 
 type someStruct struct {
-	str        *strings.Builder
-	funcs      *functions
-	tabs       int
-	precedence int
-	parent     string
-	direction  bool
+	Str  *strings.Builder
+	Tabs int
+	Data *data
 }
 
-func (s *someStruct) add(strs ...string) {
-	for _, str := range strs {
-		s.str.WriteString(str)
-	}
+func (s *someStruct) add(str string) {
+	s.Str.WriteString(str)
 }
 
-func (s *someStruct) addln(strs ...string) {
-	for _, str := range strs {
-		s.str.WriteString(str)
-	}
-	s.str.WriteString("\n")
+func (s *someStruct) addln(str string) {
+	s.Str.WriteString(str + "\n")
+}
+
+func (s *someStruct) addpad(str string) {
+	s.Str.WriteString(" " + str + " ")
 }
 
 func (s *someStruct) tab() *someStruct {
-	s.str.WriteString(strings.Repeat("\t", s.tabs))
+	s.Str.WriteString(strings.Repeat("\t", s.Tabs))
 	return s
 }
 
-func (s *someStruct) wrap(expr *ast.Expr) {
+func (s *someStruct) wrap(expr ast.Expr) {
 	s.add("(")
-	s.exprToString(expr)
+	s.beautifyExpr(expr)
 	s.add(")")
+}
+
+func (s *someStruct) addComma(idx int, length int) {
+	if idx < length-1 {
+		s.Str.WriteString(", ")
+	}
 }
 
 func isValid(str string) bool {
@@ -65,176 +58,8 @@ func isValid(str string) bool {
 	return true
 }
 
-func (s *someStruct) compileAttrGetExpr(expr *ast.AttrGetExpr) {
-	switch ex := expr.Object.(type) {
-	case *ast.StringExpr:
-		if ex.Value == "" {
-			s.add("string")
-			break
-		}
-		s.wrap(&expr.Object)
-	case *ast.IdentExpr:
-		s.exprToString(&expr.Object)
-	case *ast.AttrGetExpr:
-		s.exprToString(&expr.Object)
-	default:
-		s.wrap(&expr.Object)
-	}
-	if str, ok := expr.Key.(*ast.StringExpr); ok && isValid(str.Value) {
-		s.add(".", str.Value)
-	} else {
-		s.add("[")
-		s.exprToString(&expr.Key)
-		s.add("]")
-	}
-}
-
-func (s *someStruct) compileTableExpr(expr *ast.TableExpr) {
-	s.add("{")
-	for _, field := range expr.Fields {
-		if field.Key != nil {
-			s.add("[")
-			s.exprToString(&field.Key)
-			s.add("] = ")
-		}
-		s.exprToString(&field.Value)
-		s.add(",")
-	}
-	s.add("}")
-}
-
-func (s *someStruct) compileUnaryOpExpr(expr *ast.Expr) {
-	switch ex := (*expr).(type) {
-	case *ast.UnaryMinusOpExpr:
-		s.add("-")
-		expr = &ex.Expr
-	case *ast.UnaryNotOpExpr:
-		s.add("not")
-		expr = &ex.Expr
-	case *ast.UnaryLenOpExpr:
-		s.add("#")
-		expr = &ex.Expr
-	}
-	// Skidded from luamin.js
-	if unaryPrecedence < s.precedence && !((s.parent == "^") && s.direction == right) {
-		s.precedence = unaryPrecedence
-		s.wrap(expr)
-	} else {
-		s.precedence = unaryPrecedence
-		s.exprToString(expr)
-	}
-}
-
-func (s *someStruct) compileRelationalOpExpr(expr *ast.RelationalOpExpr) {
-	s.add("(")
-	s.exprToString(&expr.Lhs)
-	s.add(" ", expr.Operator, " ")
-	s.exprToString(&expr.Rhs)
-	s.add(")")
-}
-
-func (s *someStruct) compileArithmeticOpExpr(expr *ast.ArithmeticOpExpr) {
-	s.add("(")
-	s.exprToString(&expr.Lhs)
-	s.add(" ", expr.Operator, " ")
-	s.exprToString(&expr.Rhs)
-	s.add(")")
-}
-
-func (s *someStruct) compileStringConcatOpExpr(expr *ast.StringConcatOpExpr) {
-	s.exprToString(&expr.Lhs)
-	s.add(" .. ")
-	s.exprToString(&expr.Rhs)
-}
-
-func (s *someStruct) compileLogicalOpExpr(expr *ast.LogicalOpExpr) {
-	s.add("(")
-	s.exprToString(&expr.Lhs)
-	s.add(" ", expr.Operator, " ")
-	s.exprToString(&expr.Rhs)
-	s.add(")")
-}
-
-func (s *someStruct) compileFuncCallExpr(expr *ast.FuncCallExpr) {
-	if expr.Func != nil { // hoge.func()
-		switch expr.Func.(type) {
-		case *ast.IdentExpr:
-			s.exprToString(&expr.Func)
-		case *ast.TableExpr:
-			s.exprToString(&expr.Func)
-		case *ast.AttrGetExpr:
-			s.exprToString(&expr.Func)
-		default:
-			s.wrap(&expr.Func)
-		}
-	} else { // hoge:method()
-		s.exprToString(&expr.Receiver)
-		s.add(":", string(expr.Method))
-	}
-
-	s.add("(")
-	for i := range expr.Args {
-		s.exprToString(&expr.Args[i])
-		if i < len(expr.Args)-1 {
-			s.add(", ")
-		}
-	}
-	s.add(")")
-}
-
-func (s *someStruct) compileFunctionExpr(expr *ast.FunctionExpr) {
-	s.add("(function(")
-	for i, name := range expr.ParList.Names {
-		s.add(name)
-		s.addComma(i, len(expr.ParList.Names))
-	}
-	if expr.ParList.HasVargs {
-		if len(expr.ParList.Names) > 0 {
-			s.add(", ")
-		}
-		s.add("...")
-	}
-	s.addln(")")
-	s.tabs++
-	s.traverseStmt(&expr.Stmts)
-	s.tabs--
-	s.tab().add("end)")
-}
-
-func (s *someStruct) compileStringExpr(expr *ast.StringExpr) {
-	s.str.WriteRune('"')
-	for i, ch := range expr.Value {
-		switch ch {
-		case '\a':
-			s.add("\\a")
-		case '\b':
-			s.add("\\b")
-		case '\f':
-			s.add("\\f")
-		case '\n':
-			s.add("\\n")
-		case '\r':
-			s.add("\\r")
-		case '\t':
-			s.add("\\t")
-		case '\v':
-			s.add("\\v")
-		case '\\':
-			s.add("\\\\")
-		case '"':
-			s.add("\\\"")
-		case 65533:
-			s.str.WriteRune('\\')
-			s.str.WriteString(fmt.Sprint([]byte(expr.Value)[i]))
-		default:
-			s.str.WriteRune(ch)
-		}
-	}
-	s.str.WriteRune('"')
-}
-
-func (s *someStruct) exprToString(expr *ast.Expr) {
-	switch ex := (*expr).(type) {
+func (s *someStruct) beautifyExpr(expr ast.Expr) {
+	switch ex := expr.(type) {
 	case *ast.NumberExpr:
 		s.add(ex.Value)
 	case *ast.NilExpr:
@@ -248,125 +73,198 @@ func (s *someStruct) exprToString(expr *ast.Expr) {
 	case *ast.Comma3Expr:
 		s.add("...")
 	case *ast.StringExpr:
-		s.compileStringExpr(ex)
-	case *ast.AttrGetExpr:
-		s.compileAttrGetExpr(ex)
-	case *ast.TableExpr:
-		s.compileTableExpr(ex)
-	case *ast.ArithmeticOpExpr:
-		s.compileArithmeticOpExpr(ex)
-	case *ast.StringConcatOpExpr:
-		s.compileStringConcatOpExpr(ex)
-	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr:
-		s.compileUnaryOpExpr(expr)
-	case *ast.RelationalOpExpr:
-		s.compileRelationalOpExpr(ex)
-	case *ast.LogicalOpExpr:
-		s.compileLogicalOpExpr(ex)
-	case *ast.FuncCallExpr:
-		s.compileFuncCallExpr(ex)
-	case *ast.FunctionExpr:
-		s.compileFunctionExpr(ex)
-	}
-}
-
-func (s *someStruct) whileStmt(stmt *ast.WhileStmt) {
-	s.tab().add("while ")
-	s.exprToString(&stmt.Condition)
-	s.addln(" do")
-	s.tabs++
-	s.traverseStmt(&stmt.Stmts)
-	s.tabs--
-	s.tab().addln("end")
-}
-
-func (s *someStruct) repeatStmt(stmt *ast.RepeatStmt) {
-	s.tab().addln("repeat")
-	s.tabs++
-	s.traverseStmt(&stmt.Stmts)
-	s.tabs--
-	s.tab().add("until ")
-	s.exprToString(&stmt.Condition)
-	s.addln()
-}
-
-func (s *someStruct) doBlockStmt(stmt *ast.DoBlockStmt) {
-	s.tab().addln("do")
-	s.tabs++
-	s.traverseStmt(&stmt.Stmts)
-	s.tabs--
-	s.tab().addln("end")
-}
-
-func (s *someStruct) addComma(idx int, length int) {
-	if idx < length-1 {
-		s.add(", ")
-	}
-}
-
-func (s *someStruct) assignStmt(stmt *ast.AssignStmt) {
-	s.tab()
-	for i, ex := range stmt.Lhs {
-		s.exprToString(&ex)
-		s.addComma(i, len(stmt.Lhs))
-	}
-	s.add(" = ")
-	for i, ex := range stmt.Rhs {
-		s.exprToString(&ex)
-		s.addComma(i, len(stmt.Rhs))
-	}
-	s.addln()
-}
-
-func (s *someStruct) localAssignStmt(stmt *ast.LocalAssignStmt) {
-	s.tab().add("local ")
-	for i, name := range stmt.Names {
-		s.add(name)
-		s.addComma(i, len(stmt.Names))
-	}
-	if len(stmt.Exprs) > 0 {
-		s.add(" = ")
-		for i, ex := range stmt.Exprs {
-			s.exprToString(&ex)
-			s.addComma(i, len(stmt.Exprs))
+		s.Str.WriteRune('"')
+		for i, ch := range ex.Value {
+			switch ch {
+			case '\a':
+				s.add("\\a")
+			case '\b':
+				s.add("\\b")
+			case '\f':
+				s.add("\\f")
+			case '\n':
+				s.add("\\n")
+			case '\r':
+				s.add("\\r")
+			case '\t':
+				s.add("\\t")
+			case '\v':
+				s.add("\\v")
+			case '\\':
+				s.add("\\\\")
+			case '"':
+				s.add("\\\"")
+			case 65533:
+				s.Str.WriteRune('\\')
+				s.Str.WriteString(fmt.Sprint([]byte(ex.Value)[i])) //TODO use strconv
+			default:
+				s.Str.WriteRune(ch)
+			}
 		}
-	}
-	s.addln()
-}
+		s.Str.WriteRune('"')
+	case *ast.AttrGetExpr:
+		switch obj := ex.Object.(type) {
+		case *ast.StringExpr:
+			if obj.Value == "" {
+				s.add("string")
+				break
+			}
+			s.wrap(ex.Object)
+		case *ast.IdentExpr:
+			s.beautifyExpr(ex.Object)
+		case *ast.AttrGetExpr:
+			s.beautifyExpr(ex.Object)
+		default:
+			s.wrap(ex.Object)
+		}
+		if str, ok := ex.Key.(*ast.StringExpr); ok && isValid(str.Value) {
+			s.add(".")
+			s.add(str.Value)
+		} else {
+			s.add("[")
+			s.beautifyExpr(ex.Key)
+			s.add("]")
+		}
+	case *ast.TableExpr:
+		s.add("{")
+		for _, field := range ex.Fields {
+			if field.Key != nil {
+				s.add("[")
+				s.beautifyExpr(field.Key)
+				s.add("] = ")
+			}
+			s.beautifyExpr(field.Value)
+			s.add(",")
+		}
+		s.add("}")
+	case *ast.ArithmeticOpExpr, *ast.StringConcatOpExpr, *ast.RelationalOpExpr, *ast.LogicalOpExpr:
+		var currentPrecedence int
+		var operator string
+		var associativity  bool
+		var Lhs ast.Expr
+		var Rhs ast.Expr
 
-func (s *someStruct) returnStmt(stmt *ast.ReturnStmt) {
-	s.tab().add("return ")
-	for i, ex := range stmt.Exprs {
-		s.exprToString(&ex)
-		s.addComma(i, len(stmt.Exprs))
-	}
-	s.addln()
-}
+		switch ex := expr.(type) {
+		case *ast.LogicalOpExpr:
+			switch ex.Operator {
+			case "or":
+				currentPrecedence = 1
+			case "and":
+				currentPrecedence = 2
+			}
+			operator = ex.Operator
+			Lhs = ex.Lhs
+			Rhs =ex.Rhs
+		case *ast.RelationalOpExpr:
+			currentPrecedence = 3
+			operator = ex.Operator
+			Lhs = ex.Lhs
+			Rhs =ex.Rhs
+		case *ast.StringConcatOpExpr:
+			currentPrecedence = 5
+			operator = ".."
+			associativity = true
+			Lhs = ex.Lhs
+			Rhs =ex.Rhs
+		case *ast.ArithmeticOpExpr:
+			switch ex.Operator {
+			case "+", "-":
+				currentPrecedence = 6
+			case "*", "/", "%":
+				currentPrecedence = 7
+			case "^":
+				currentPrecedence = 10
+				associativity = true
+			}
+			operator = ex.Operator
+			Lhs = ex.Lhs
+			Rhs = ex.Rhs
+		}
 
-func (s *someStruct) funcDefStmt(stmt *ast.FuncDefStmt) {
+		if currentPrecedence < s.Data.Precedence ||
+		(currentPrecedence == s.Data.Precedence &&
+		associativity != s.Data.Direction &&
+		s.Data.Parent != "+" && 
+		!(s.Data.Parent == "*" && (operator == "/" || operator == "*"))) {
+			s.add("(")
+			s.Data = &data{currentPrecedence, false, operator}
+			s.beautifyExpr(Lhs)
+			s.addpad(operator)
+			s.Data = &data{currentPrecedence, true, operator}
+			s.beautifyExpr(Rhs)
+			s.add(")")
+		} else {
+			s.Data = &data{currentPrecedence, false, operator}
+			s.beautifyExpr(Lhs)
+			s.addpad(operator)
+			s.Data = &data{currentPrecedence, true, operator}
+			s.beautifyExpr(Rhs)
+		}
+		s.Data = &data{} // Reset the data
+	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr:
+		switch ex := expr.(type) {
+		case *ast.UnaryMinusOpExpr:
+			s.add("-")
+			expr = ex.Expr
+		case *ast.UnaryNotOpExpr:
+			s.add("not")
+			expr = ex.Expr
+		case *ast.UnaryLenOpExpr:
+			s.add("#")
+			expr = ex.Expr
+		}
+		// Skidded from luamin.js
+		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction == true) {
+			s.add("(")
+			s.Data = &data{Precedence: 8}
+			s.beautifyExpr(expr)
+			s.add(")")
+		} else {
+			s.Data = &data{Precedence: 8}
+			s.beautifyExpr(expr)
+		}
+		s.Data = &data{} // Reset the data
+	case *ast.FuncCallExpr:
+		if ex.Func != nil { // hoge.func()
+			switch ex.Func.(type) {
+			case *ast.IdentExpr:
+				s.beautifyExpr(ex.Func)
+			case *ast.TableExpr:
+				s.beautifyExpr(ex.Func)
+			case *ast.AttrGetExpr:
+				s.beautifyExpr(ex.Func)
+			default:
+				s.wrap(ex.Func)
+			}
+		} else { // hoge:method()
+			s.beautifyExpr(ex.Receiver)
+			s.add(":")
+			s.add(ex.Method)
+		}
 
-}
-
-func (s *someStruct) compileBranchCondition(expr ast.Expr) {
-	switch ex := expr.(type) {
-	case *ast.UnaryNotOpExpr:
-		s.add("not (")
-		s.compileBranchCondition(ex.Expr)
-		s.add(")")
-	case *ast.LogicalOpExpr:
 		s.add("(")
-		s.compileBranchCondition(ex.Lhs)
-		s.add(" ", ex.Operator, " ")
-		s.compileBranchCondition(ex.Rhs)
+		for i := range ex.Args {
+			s.beautifyExpr(ex.Args[i])
+			s.addComma(i, len(ex.Args))
+		}
 		s.add(")")
-	case *ast.RelationalOpExpr:
-		s.add("(")
-		s.exprToString(&ex.Lhs)
-		s.add(" ", ex.Operator, " ")
-		s.exprToString(&ex.Rhs)
-		s.add(")")
-	default:
-		s.exprToString(&expr)
+	case *ast.FunctionExpr:
+		s.add("function(")
+		for i, name := range ex.ParList.Names {
+			s.add(name)
+			s.addComma(i, len(ex.ParList.Names))
+		}
+		if ex.ParList.HasVargs {
+			if len(ex.ParList.Names) > 0 {
+				s.add(", ")
+			}
+			s.add("...")
+		}
+		s.addln(")")
+		s.Tabs++
+		s.beautifyStmt(ex.Stmts)
+		s.Tabs--
+		s.tab().add("end")
 	}
 }
 
@@ -374,109 +272,132 @@ func (s *someStruct) elseBody(elseStmt []ast.Stmt) {
 	if len(elseStmt) > 0 {
 		if elseif, ok := elseStmt[0].(*ast.IfStmt); ok && len(elseStmt) == 1 {
 			s.tab().add("elseif ")
-			s.compileBranchCondition(elseif.Condition)
+			s.beautifyExpr(elseif.Condition)
 			s.addln(" then")
-			s.tabs++
-			s.traverseStmt(&elseif.Then)
-			s.tabs--
+			s.Tabs++
+			s.beautifyStmt(elseif.Then)
+			s.Tabs--
 			s.elseBody(elseif.Else)
 		} else {
 			s.tab().addln("else")
-			s.tabs++
-			s.traverseStmt(&elseStmt)
-			s.tabs--
+			s.Tabs++
+			s.beautifyStmt(elseStmt)
+			s.Tabs--
 		}
 	}
 }
 
-func (s *someStruct) ifStmt(stmt *ast.IfStmt) {
-	s.tab().add("if ")
-	s.compileBranchCondition(stmt.Condition)
-	s.addln(" then")
-	s.tabs++
-	s.traverseStmt(&stmt.Then)
-	s.tabs--
-	s.elseBody(stmt.Else)
-	s.tab().addln("end")
-}
-
-func (s *someStruct) breakStmt() {
-	s.tab().addln("break")
-}
-
-func (s *someStruct) numberForStmt(stmt *ast.NumberForStmt) {
-	s.tab().add("for ", stmt.Name, " = ")
-	s.exprToString(&stmt.Init)
-	s.add(", ")
-	s.exprToString(&stmt.Limit)
-	if stmt.Step != nil {
-		s.add(", ")
-		s.exprToString(&stmt.Step)
-	}
-	s.addln(" do")
-	s.tabs++
-	s.traverseStmt(&stmt.Stmts)
-	s.tabs--
-	s.tab().addln("end")
-}
-
-func (s *someStruct) genericForStmt(stmt *ast.GenericForStmt) {
-	s.tab().add("for ")
-	for i, name := range stmt.Names {
-		s.add(name)
-		s.addComma(i, len(stmt.Names))
-	}
-	s.add(" in ")
-	for _, ex := range stmt.Exprs {
-		s.exprToString(&ex)
-	}
-	s.addln(" do")
-	s.tabs++
-	s.traverseStmt(&stmt.Stmts)
-	s.tabs--
-	s.tab().addln("end")
-}
-
-func (s *someStruct) funcCallStmt(stmt *ast.FuncCallStmt) {
-	s.tab()
-	s.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr))
-	s.addln()
-}
-
-func (s *someStruct) traverseStmt(chunk *[]ast.Stmt) {
-	for _, stmt := range *chunk {
-		switch st := stmt.(type) {
+func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
+	for _, st := range chunk {
+		s.tab()
+		switch stmt := st.(type) {
 		case *ast.AssignStmt:
-			s.assignStmt(st)
+			for i, ex := range stmt.Lhs {
+				s.beautifyExpr(ex)
+				s.addComma(i, len(stmt.Lhs))
+			}
+			s.addpad("=")
+			for i, ex := range stmt.Rhs {
+				s.beautifyExpr(ex)
+				s.addComma(i, len(stmt.Rhs))
+			}
 		case *ast.LocalAssignStmt:
-			s.localAssignStmt(st)
+			s.add("local ")
+			for i, name := range stmt.Names {
+				s.add(name)
+				s.addComma(i, len(stmt.Names))
+			}
+			if len(stmt.Exprs) > 0 {
+				s.add(" = ")
+				for i, ex := range stmt.Exprs {
+					s.beautifyExpr(ex)
+					s.addComma(i, len(stmt.Exprs))
+				}
+			}
 		case *ast.FuncCallStmt:
-			s.funcCallStmt(st)
+			//s.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr))
 		case *ast.DoBlockStmt:
-			s.doBlockStmt(st)
+			s.addln("do")
+			s.Tabs++
+			s.beautifyStmt(stmt.Stmts)
+			s.Tabs--
+			s.tab().add("end")
 		case *ast.WhileStmt:
-			s.whileStmt(st)
+			s.add("while ")
+			s.beautifyExpr(stmt.Condition)
+			s.addln(" do")
+			s.Tabs++
+			s.beautifyStmt(stmt.Stmts)
+			s.Tabs--
+			s.tab().add("end")
 		case *ast.RepeatStmt:
-			s.repeatStmt(st)
+			s.addln("repeat")
+			s.Tabs++
+			s.beautifyStmt(stmt.Stmts)
+			s.Tabs--
+			s.tab().add("until ")
+			s.beautifyExpr(stmt.Condition)
 		case *ast.FuncDefStmt:
-			s.funcDefStmt(st)
+
 		case *ast.ReturnStmt:
-			s.returnStmt(st)
+			s.add("return ")
+			for i, ex := range stmt.Exprs {
+				s.beautifyExpr(ex)
+				s.addComma(i, len(stmt.Exprs))
+			}
 		case *ast.IfStmt:
-			s.ifStmt(st)
+			s.add("if ")
+			s.beautifyExpr(stmt.Condition)
+			s.addln(" then")
+			s.Tabs++
+			s.beautifyStmt(stmt.Then)
+			s.Tabs--
+			s.elseBody(stmt.Else)
+			s.tab().add("end")
 		case *ast.BreakStmt:
-			s.breakStmt()
+			s.add("break")
 		case *ast.NumberForStmt:
-			s.numberForStmt(st)
+			s.add("for ")
+			s.add(stmt.Name)
+			s.addpad("=")
+			s.beautifyExpr(stmt.Init)
+			s.add(", ")
+			s.beautifyExpr(stmt.Limit)
+			if stmt.Step != nil {
+				s.add(", ")
+				s.beautifyExpr(stmt.Step)
+			}
+			s.addln(" do")
+			s.Tabs++
+			s.beautifyStmt(stmt.Stmts)
+			s.Tabs--
+			s.tab().add("end")
 		case *ast.GenericForStmt:
-			s.genericForStmt(st)
+			s.add("for ")
+			for i, name := range stmt.Names {
+				s.add(name)
+				s.addComma(i, len(stmt.Names))
+			}
+			s.addpad("in")
+			for _, ex := range stmt.Exprs {
+				s.beautifyExpr(ex)
+			}
+			s.addln(" do")
+			s.Tabs++
+			s.beautifyStmt(stmt.Stmts)
+			s.Tabs--
+			s.tab().add("end")
 		}
+		s.Str.WriteRune('\n')
 	}
 }
 
 // Beautify the Abstract Syntax Tree
-func Beautify(ast *[]ast.Stmt) string {
-	s := &someStruct{str: &strings.Builder{}}
-	s.traverseStmt(ast)
-	return s.str.String()
+func Beautify(ast []ast.Stmt) string {
+	s := &someStruct{
+		Str: &strings.Builder{},
+		Data: &data{},
+	}
+	s.beautifyStmt(ast)
+	return s.Str.String()
 }
