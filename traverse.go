@@ -1,7 +1,7 @@
 package beautifier
 
 import (
-	"github.com/yuin/gopher-lua/ast"
+	"github.com/notnoobmaster/beautifier/ast"
 	"github.com/yuin/gopher-lua"
 )
 
