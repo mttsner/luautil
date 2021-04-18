@@ -6,7 +6,7 @@ import (
 	"testing"
 	_ "embed"
 
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/notnoobmaster/beautifier/parse"
 )
 
 func TestBeautifiy(t *testing.T) {
@@ -15,7 +15,7 @@ func TestBeautifiy(t *testing.T) {
 		t.Fatal(err)
 	}
 	
-	file, err := os.Create("beautified.lua")
+	file, err := os.Create("tests/beautified.lua")
 
 	file.WriteString(Beautify(chunk))
 }

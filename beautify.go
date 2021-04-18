@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yuin/gopher-lua/ast"
+	"github.com/notnoobmaster/beautifier/ast"
 )
 
 type data struct {
@@ -25,6 +25,10 @@ func (s *someStruct) add(str string) {
 
 func (s *someStruct) addln(str string) {
 	s.Str.WriteString(str + "\n")
+}
+
+func (s *someStruct) addRune(r rune) {
+	s.Str.WriteRune(r)
 }
 
 func (s *someStruct) addpad(str string) {
@@ -73,50 +77,34 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 	case *ast.Comma3Expr:
 		s.add("...")
 	case *ast.StringExpr:
-		s.Str.WriteRune('"')
+		s.addRune('"')
 		for i, ch := range ex.Value {
 			switch ch {
-			case '\a':
-				s.add("\\a")
-			case '\b':
-				s.add("\\b")
-			case '\f':
-				s.add("\\f")
-			case '\n':
-				s.add("\\n")
-			case '\r':
-				s.add("\\r")
-			case '\t':
-				s.add("\\t")
-			case '\v':
-				s.add("\\v")
-			case '\\':
-				s.add("\\\\")
-			case '"':
-				s.add("\\\"")
+			case '\a', '\b', '\f', '\n', '\r', '\t', '\v', '\\', '"':
+				s.addRune('\\')
+				s.addRune(ch)
 			case 65533:
-				s.Str.WriteRune('\\')
+				s.addRune('\\')
 				s.Str.WriteString(fmt.Sprint([]byte(ex.Value)[i])) //TODO use strconv
 			default:
-				s.Str.WriteRune(ch)
+				s.addRune(ch)
 			}
 		}
-		s.Str.WriteRune('"')
+		s.addRune('"')
 	case *ast.AttrGetExpr:
 		switch obj := ex.Object.(type) {
+		case *ast.IdentExpr, *ast.AttrGetExpr:
+			s.beautifyExpr(ex.Object)
 		case *ast.StringExpr:
 			if obj.Value == "" {
 				s.add("string")
 				break
 			}
 			s.wrap(ex.Object)
-		case *ast.IdentExpr:
-			s.beautifyExpr(ex.Object)
-		case *ast.AttrGetExpr:
-			s.beautifyExpr(ex.Object)
 		default:
 			s.wrap(ex.Object)
 		}
+
 		if str, ok := ex.Key.(*ast.StringExpr); ok && isValid(str.Value) {
 			s.add(".")
 			s.add(str.Value)
@@ -127,20 +115,37 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 		}
 	case *ast.TableExpr:
 		s.add("{")
-		for _, field := range ex.Fields {
+		s.Tabs++
+		length := len(ex.Fields)
+		for idx, field := range ex.Fields {
+			s.addln("")
+			s.tab()
 			if field.Key != nil {
-				s.add("[")
-				s.beautifyExpr(field.Key)
-				s.add("] = ")
+				if str, ok := field.Key.(*ast.StringExpr); ok && isValid(str.Value) {
+					s.add(str.Value)
+				} else {
+					s.add("[")
+					s.beautifyExpr(field.Key)
+					s.add("]")
+				}
+				s.add(" = ")
 			}
 			s.beautifyExpr(field.Value)
-			s.add(",")
+			if idx < length-1 {
+				s.Str.WriteRune(',')
+				continue
+			}
+			s.addln("")
+			s.Tabs--
+			s.tab()
+			s.Tabs++
 		}
+		s.Tabs--
 		s.add("}")
 	case *ast.ArithmeticOpExpr, *ast.StringConcatOpExpr, *ast.RelationalOpExpr, *ast.LogicalOpExpr:
 		var currentPrecedence int
 		var operator string
-		var associativity  bool
+		var associativity bool
 		var Lhs ast.Expr
 		var Rhs ast.Expr
 
@@ -154,18 +159,18 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 			}
 			operator = ex.Operator
 			Lhs = ex.Lhs
-			Rhs =ex.Rhs
+			Rhs = ex.Rhs
 		case *ast.RelationalOpExpr:
 			currentPrecedence = 3
 			operator = ex.Operator
 			Lhs = ex.Lhs
-			Rhs =ex.Rhs
+			Rhs = ex.Rhs
 		case *ast.StringConcatOpExpr:
 			currentPrecedence = 5
 			operator = ".."
 			associativity = true
 			Lhs = ex.Lhs
-			Rhs =ex.Rhs
+			Rhs = ex.Rhs
 		case *ast.ArithmeticOpExpr:
 			switch ex.Operator {
 			case "+", "-":
@@ -182,10 +187,10 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 		}
 
 		if currentPrecedence < s.Data.Precedence ||
-		(currentPrecedence == s.Data.Precedence &&
-		associativity != s.Data.Direction &&
-		s.Data.Parent != "+" && 
-		!(s.Data.Parent == "*" && (operator == "/" || operator == "*"))) {
+			(currentPrecedence == s.Data.Precedence &&
+				associativity != s.Data.Direction &&
+				s.Data.Parent != "+" &&
+				!(s.Data.Parent == "*" && (operator == "/" || operator == "*"))) {
 			s.add("(")
 			s.Data = &data{currentPrecedence, false, operator}
 			s.beautifyExpr(Lhs)
@@ -201,37 +206,40 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 			s.beautifyExpr(Rhs)
 		}
 		s.Data = &data{} // Reset the data
-	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr:
+	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr, *ast.UnaryBitwiseNotOpExpr:
+		var prefix string
 		switch ex := expr.(type) {
 		case *ast.UnaryMinusOpExpr:
-			s.add("-")
+			prefix = "-"
 			expr = ex.Expr
 		case *ast.UnaryNotOpExpr:
-			s.add("not")
+			prefix = "not "
 			expr = ex.Expr
 		case *ast.UnaryLenOpExpr:
-			s.add("#")
+			prefix = "#"
+			expr = ex.Expr
+		case *ast.UnaryBitwiseNotOpExpr:
+			
+			prefix = "~"
 			expr = ex.Expr
 		}
+		fmt.Println("Bitwise not")
 		// Skidded from luamin.js
 		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction == true) {
-			s.add("(")
 			s.Data = &data{Precedence: 8}
+			s.add("(" + prefix)
 			s.beautifyExpr(expr)
 			s.add(")")
 		} else {
 			s.Data = &data{Precedence: 8}
+			s.add(prefix)
 			s.beautifyExpr(expr)
 		}
 		s.Data = &data{} // Reset the data
 	case *ast.FuncCallExpr:
 		if ex.Func != nil { // hoge.func()
 			switch ex.Func.(type) {
-			case *ast.IdentExpr:
-				s.beautifyExpr(ex.Func)
-			case *ast.TableExpr:
-				s.beautifyExpr(ex.Func)
-			case *ast.AttrGetExpr:
+			case *ast.IdentExpr, *ast.TableExpr, *ast.AttrGetExpr:
 				s.beautifyExpr(ex.Func)
 			default:
 				s.wrap(ex.Func)
@@ -261,9 +269,7 @@ func (s *someStruct) beautifyExpr(expr ast.Expr) {
 			s.add("...")
 		}
 		s.addln(")")
-		s.Tabs++
 		s.beautifyStmt(ex.Stmts)
-		s.Tabs--
 		s.tab().add("end")
 	}
 }
@@ -274,20 +280,17 @@ func (s *someStruct) elseBody(elseStmt []ast.Stmt) {
 			s.tab().add("elseif ")
 			s.beautifyExpr(elseif.Condition)
 			s.addln(" then")
-			s.Tabs++
 			s.beautifyStmt(elseif.Then)
-			s.Tabs--
 			s.elseBody(elseif.Else)
 		} else {
 			s.tab().addln("else")
-			s.Tabs++
 			s.beautifyStmt(elseStmt)
-			s.Tabs--
 		}
 	}
 }
 
 func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
+	s.Tabs++
 	for _, st := range chunk {
 		s.tab()
 		switch stmt := st.(type) {
@@ -315,30 +318,58 @@ func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
 				}
 			}
 		case *ast.FuncCallStmt:
-			//s.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr))
+			ex := stmt.Expr.(*ast.FuncCallExpr)
+			if ex.Func != nil {
+				switch ex.Func.(type) {
+				case *ast.IdentExpr, *ast.TableExpr, *ast.AttrGetExpr:
+					s.beautifyExpr(ex.Func)
+				default:
+					s.wrap(ex.Func)
+				}
+			} else {
+				s.beautifyExpr(ex.Receiver)
+				s.add(":")
+				s.add(ex.Method)
+			}
+
+			s.add("(")
+			for i := range ex.Args {
+				s.beautifyExpr(ex.Args[i])
+				s.addComma(i, len(ex.Args))
+			}
+			s.add(")")
 		case *ast.DoBlockStmt:
 			s.addln("do")
-			s.Tabs++
 			s.beautifyStmt(stmt.Stmts)
-			s.Tabs--
 			s.tab().add("end")
 		case *ast.WhileStmt:
 			s.add("while ")
 			s.beautifyExpr(stmt.Condition)
 			s.addln(" do")
-			s.Tabs++
 			s.beautifyStmt(stmt.Stmts)
-			s.Tabs--
 			s.tab().add("end")
 		case *ast.RepeatStmt:
 			s.addln("repeat")
-			s.Tabs++
 			s.beautifyStmt(stmt.Stmts)
-			s.Tabs--
 			s.tab().add("until ")
 			s.beautifyExpr(stmt.Condition)
 		case *ast.FuncDefStmt:
-
+			s.add("function ")
+			if stmt.Name.Func == nil {
+				s.beautifyExpr(stmt.Name.Receiver)
+				s.Str.WriteRune(':')
+				s.add(stmt.Name.Method)
+			} else {
+				s.beautifyExpr(stmt.Name.Func)
+			}
+			s.addRune('(')
+			for i, name := range stmt.Func.ParList.Names {
+				s.add(name)
+				s.addComma(i, len(stmt.Func.ParList.Names))
+			}
+			s.addln(")")
+			s.beautifyStmt(stmt.Func.Stmts)
+			s.tab().add("end")
 		case *ast.ReturnStmt:
 			s.add("return ")
 			for i, ex := range stmt.Exprs {
@@ -349,17 +380,17 @@ func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
 			s.add("if ")
 			s.beautifyExpr(stmt.Condition)
 			s.addln(" then")
-			s.Tabs++
 			s.beautifyStmt(stmt.Then)
-			s.Tabs--
 			s.elseBody(stmt.Else)
 			s.tab().add("end")
 		case *ast.BreakStmt:
 			s.add("break")
+		case *ast.ContinueStmt:
+			s.add("continue")
 		case *ast.NumberForStmt:
 			s.add("for ")
 			s.add(stmt.Name)
-			s.addpad("=")
+			s.add(" = ")
 			s.beautifyExpr(stmt.Init)
 			s.add(", ")
 			s.beautifyExpr(stmt.Limit)
@@ -368,9 +399,7 @@ func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
 				s.beautifyExpr(stmt.Step)
 			}
 			s.addln(" do")
-			s.Tabs++
 			s.beautifyStmt(stmt.Stmts)
-			s.Tabs--
 			s.tab().add("end")
 		case *ast.GenericForStmt:
 			s.add("for ")
@@ -378,25 +407,25 @@ func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
 				s.add(name)
 				s.addComma(i, len(stmt.Names))
 			}
-			s.addpad("in")
+			s.add(" in ")
 			for _, ex := range stmt.Exprs {
 				s.beautifyExpr(ex)
 			}
 			s.addln(" do")
-			s.Tabs++
 			s.beautifyStmt(stmt.Stmts)
-			s.Tabs--
 			s.tab().add("end")
 		}
-		s.Str.WriteRune('\n')
+		s.add(";\n")
 	}
+	s.Tabs--
 }
 
 // Beautify the Abstract Syntax Tree
 func Beautify(ast []ast.Stmt) string {
 	s := &someStruct{
-		Str: &strings.Builder{},
+		Str:  &strings.Builder{},
 		Data: &data{},
+		Tabs: -1, // Accounting for the fact that each beautifyStmt call increments Tabs by one
 	}
 	s.beautifyStmt(ast)
 	return s.Str.String()

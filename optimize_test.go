@@ -6,10 +6,10 @@ import (
 	"testing"
 	_ "embed"
 
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/notnoobmaster/beautifier/parse"
 )
 
-//go:embed test.lua
+//go:embed tests/test.lua
 var test string
 
 func TestOptimize(t *testing.T) {
@@ -20,7 +20,7 @@ func TestOptimize(t *testing.T) {
 	
 	Optimize(chunk)
 	
-	file, err := os.Create("optimized.lua")
+	file, err := os.Create("tests/optimized.lua")
 
 	file.WriteString(Beautify(chunk))
 }

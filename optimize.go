@@ -3,7 +3,7 @@ package beautifier
 import (
 	"fmt"
 	"math"
-	"github.com/yuin/gopher-lua/ast"
+	"github.com/notnoobmaster/beautifier/ast"
 	"strconv"
 )
 
@@ -95,10 +95,6 @@ func length(expr *ast.UnaryLenOpExpr) ast.Expr {
 	return nil
 }
 
-func stringify(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
-}
-
 func arithmetic(op string, left *ast.Expr, right *ast.Expr) ast.Expr {
 	l, okl := (*left).(*ast.NumberExpr)
 	r, okr := (*right).(*ast.NumberExpr)
@@ -121,8 +117,8 @@ func arithmetic(op string, left *ast.Expr, right *ast.Expr) ast.Expr {
 		case "^":
 			result = math.Pow(lv, rv)
 		}
-		if !math.IsNaN(result) || !math.IsInf(result, 0) {
-			return &ast.NumberExpr{Value: stringify(result)}
+		if !math.IsNaN(result) && !math.IsInf(result, 0) {
+			return &ast.NumberExpr{Value: strconv.FormatFloat(result, 'f', -1, 64)}
 		}
 	}
 	return nil
