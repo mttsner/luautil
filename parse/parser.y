@@ -55,7 +55,7 @@ import (
 %token<token> TAnd TBreak TContinue TDo TElse TElseIf TEnd TFalse TFor TFunction TIf TIn TLocal TNil TNot TOr TReturn TRepeat TThen TTrue TUntil TWhile TGoto
 
 /* Literals */
-%token<token> TEqeq TNeq TLte TGte TFloorDiv TRshift TLshift T2Comma T3Comma T2Colon TIdent TNumber TString '{' '('
+%token<token> TEqeq TNeq TLte TGte TFloorDiv TRshift TLshift T2Comma T3Comma T2Colon TIdent TNumber TString '{' '(' TCompAdd
 
 /* Operators */
 %left TOr
@@ -112,6 +112,10 @@ block:
 stat:
         varlist '=' exprlist {
             $$ = &ast.AssignStmt{Lhs: $1, Rhs: $3}
+            $$.SetLine($1[0].Line())
+        } |
+        varlist TCompAdd exprlist {
+            $$ = &ast.CompoundAssignStmt{Operator: "+", Lhs: $1, Rhs: $3}
             $$.SetLine($1[0].Line())
         } |
         /* 'stat = functioncal' causes a reduce/reduce conflict */
@@ -302,7 +306,7 @@ expr:
             $$.SetLine($1.Pos.Line)
         } | 
         TNumber {
-            $$ = &ast.NumberExpr{Value: $1.Str}
+            $$ = &ast.NumberExpr{Value: $1.Num}
             $$.SetLine($1.Pos.Line)
         } | 
         T3Comma {

@@ -1,10 +1,10 @@
 package beautifier
 
 import (
-	"fmt"
 	"math"
-	"github.com/notnoobmaster/beautifier/ast"
 	"strconv"
+
+	"github.com/notnoobmaster/beautifier/ast"
 )
 
 type local struct {
@@ -29,7 +29,7 @@ func getString(expr *ast.Expr) (String string, Success bool) {
 	case *ast.StringExpr:
 		return ex.Value, true
 	case *ast.NumberExpr:
-		return ex.Value, true
+		//return ex.Value, true
 	}
 	return 
 }
@@ -62,10 +62,10 @@ func concat(left *ast.Expr, right *ast.Expr) ast.Expr {
 func length(expr *ast.UnaryLenOpExpr) ast.Expr {
 	switch ex := expr.Expr.(type) {
 	case *ast.StringExpr:
-		return &ast.NumberExpr{Value: fmt.Sprint(len(ex.Value))}
+		return &ast.NumberExpr{Value: float64(len(ex.Value))}
 	case *ast.TableExpr:
-		length := 0
-		keys := make(map[string]bool)
+		var length float64 = 0
+		keys := make(map[float64]bool)
 		for _, field := range ex.Fields {
 			if call, ok := field.Value.(*ast.FuncCallExpr); ok {
 				if function, ok := call.Func.(*ast.FunctionExpr); ok {
@@ -76,7 +76,7 @@ func length(expr *ast.UnaryLenOpExpr) ast.Expr {
 									length++
 								}
 							}
-							length += len(call.Args)
+							length += float64(len(call.Args))
 							continue
 						}
 					}
@@ -88,9 +88,9 @@ func length(expr *ast.UnaryLenOpExpr) ast.Expr {
 				keys[num.Value] = true
 			}
 		}
-		for length++; keys[fmt.Sprint(length)]; length++ {}
+		for length++; keys[length]; length++ {}
 		length--
-		return &ast.NumberExpr{Value: fmt.Sprint(length)}
+		return &ast.NumberExpr{Value: length}
 	}
 	return nil
 }
@@ -101,8 +101,8 @@ func arithmetic(op string, left *ast.Expr, right *ast.Expr) ast.Expr {
 
 	if okl && okr {
 		var result float64
-		lv, _ := strconv.ParseFloat(l.Value, 64)
-		rv, _ := strconv.ParseFloat(r.Value, 64)
+		lv := l.Value
+		rv := r.Value
 		switch op {
 		case "+":
 			result = lv+rv
@@ -118,7 +118,7 @@ func arithmetic(op string, left *ast.Expr, right *ast.Expr) ast.Expr {
 			result = math.Pow(lv, rv)
 		}
 		if !math.IsNaN(result) && !math.IsInf(result, 0) {
-			return &ast.NumberExpr{Value: strconv.FormatFloat(result, 'f', -1, 64)}
+			return &ast.NumberExpr{Value: result}
 		}
 	}
 	return nil
@@ -201,7 +201,7 @@ func getValueOfIndex(index string, table *ast.TableExpr) ast.Expr {
 		case *ast.StringExpr:
 			key = ex.Value
 		case *ast.NumberExpr:
-			key = ex.Value
+			//key = ex.Value
 		}
 		if key == index {
 			return field.Value
@@ -219,7 +219,7 @@ func (s *scope) index(expr *ast.AttrGetExpr) ast.Expr {
 				case *ast.StringExpr:
 					return getValueOfIndex(key.Value, tbl)
 				case *ast.NumberExpr:
-					return getValueOfIndex(key.Value, tbl)
+					//return getValueOfIndex(key.Value, tbl)
 				}
 			}
 		}
@@ -228,7 +228,7 @@ func (s *scope) index(expr *ast.AttrGetExpr) ast.Expr {
 		case *ast.StringExpr:
 			return getValueOfIndex(key.Value, ex)
 		case *ast.NumberExpr:
-			return getValueOfIndex(key.Value, ex)
+			//return getValueOfIndex(key.Value, ex)
 		}
 	}
 	return nil
@@ -266,7 +266,7 @@ func (s *scope) newName(local string) ast.Expr {
 
 func (s *scope) genName(str string, remove func()) string {
 	s.LocalCount++
-	new := "L_" + fmt.Sprint(s.LocalCount) + "_"
+	new := "L_" + strconv.Itoa(s.LocalCount) + "_"
 	s.Temp[str] = new
 	s.Locals[new] = &local{Original: str, Constant: true, Remove: remove}
 	return new

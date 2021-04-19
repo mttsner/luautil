@@ -1125,7 +1125,7 @@ yynewstate:
 		}
 	case 46:
 		{
-			yyVAL.expr = &ast.NumberExpr{Value: yyS[yypt-0].token.Str}
+			yyVAL.expr = &ast.NumberExpr{Value: yyS[yypt-0].token.Num}
 			yyVAL.expr.SetLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 47:

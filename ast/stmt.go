@@ -18,6 +18,14 @@ type AssignStmt struct {
 	Rhs []Expr
 }
 
+type CompoundAssignStmt struct {
+	StmtBase
+
+	Operator string
+	Lhs []Expr
+	Rhs []Expr
+}
+
 type LocalAssignStmt struct {
 	StmtBase
 
