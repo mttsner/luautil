@@ -14,6 +14,7 @@ type Token struct {
 	Type int
 	Name string
 	Str  string
+	Num float64
 	Pos  Position
 }
 

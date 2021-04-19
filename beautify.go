@@ -2,6 +2,7 @@ package beautifier
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/notnoobmaster/beautifier/ast"
@@ -65,7 +66,7 @@ func isValid(str string) bool {
 func (s *someStruct) beautifyExpr(expr ast.Expr) {
 	switch ex := expr.(type) {
 	case *ast.NumberExpr:
-		s.add(ex.Value)
+		s.add(strconv.FormatFloat(ex.Value, 'f', -1, 64))
 	case *ast.NilExpr:
 		s.add("nil")
 	case *ast.FalseExpr:

@@ -39,7 +39,7 @@ type NilExpr struct {
 type NumberExpr struct {
 	ConstExprBase
 
-	Value string
+	Value float64
 }
 
 type StringExpr struct {

@@ -33,14 +33,18 @@ func (e *Error) Error() string {
 
 func writeChar(buf *bytes.Buffer, c int) { buf.WriteByte(byte(c)) }
 
-func isDecimal(ch int) bool { return '0' <= ch && ch <= '9' }
+func isDecimal(ch int) bool { return ch == '_' || '0' <= ch && ch <= '9' }
+
+func isOctal(ch int) bool { return ch == '_' || '0' <= ch && ch <= '7' }
+
+func isBinary(ch int) bool { return ch == '_' || ch == '0' || ch == '1' }
+
+func isDigit(ch int) bool {
+	return ch == '_' || '0' <= ch && ch <= '9' || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
+}
 
 func isIdent(ch int, pos int) bool {
 	return ch == '_' || 'A' <= ch && ch <= 'Z' || 'a' <= ch && ch <= 'z' || isDecimal(ch) && pos > 0
-}
-
-func isDigit(ch int) bool {
-	return '0' <= ch && ch <= '9' || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
 }
 
 type Scanner struct {
@@ -150,41 +154,62 @@ func (sc *Scanner) scanDecimal(ch int, buf *bytes.Buffer) error {
 	return nil
 }
 
-func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) error {
-	if ch == '0' { // octal
+func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
+	if ch == '0' {
 		switch sc.Peek() {
-		case 'x', 'X', 'b', 'B', 'o', 'O':
-			writeChar(buf, ch)
-			writeChar(buf, sc.Next())
-			hasvalue := false
+		case 'x', 'X':
+			n := sc.Next()
+			if !isDigit(sc.Peek()) {
+				writeChar(buf, ch)
+				writeChar(buf, n)
+				return 0, sc.Error(buf.String(), "hex number expected")
+			}
 			for isDigit(sc.Peek()) {
+				if sc.Peek() == '_' { 
+					sc.Next()
+					continue 
+				}
 				writeChar(buf, sc.Next())
-				hasvalue = true
 			}
-			if !hasvalue {
-				return sc.Error(buf.String(), "illegal number")
+			val, _ := strconv.ParseInt(buf.String(), 16, 64)
+			return float64(val), nil
+		case 'b', 'B':
+			n := sc.Next()
+			if !isDigit(sc.Peek()) {
+				writeChar(buf, ch)
+				writeChar(buf, n)
+				return 0, sc.Error(buf.String(), "binary number expected")
 			}
-			return nil
+			for isBinary(sc.Peek()) {
+				if sc.Peek() == '_' { 
+					sc.Next()
+					continue 
+				}
+				writeChar(buf, sc.Next())
+			}
+			val, _ := strconv.ParseInt(buf.String(), 2, 64)
+			return float64(val), nil
+		case 'o', 'O':
+			n := sc.Next()
+			if !isDigit(sc.Peek()) {
+				writeChar(buf, ch)
+				writeChar(buf, n)
+				return 0, sc.Error(buf.String(), "octal number expected")
+			}
+			for isOctal(sc.Peek()) {
+				if sc.Peek() == '_' { 
+					sc.Next()
+					continue 
+				}
+				writeChar(buf, sc.Next())
+			}
+			val, _ := strconv.ParseInt(buf.String(), 8, 64)
+			return float64(val), nil
 		default:
 			if sc.Peek() != '.' && isDecimal(sc.Peek()) {
 				ch = sc.Next()
 			}
-		}/*
-		if sc.Peek() == 'x' || sc.Peek() == 'X' {
-			writeChar(buf, ch)
-			writeChar(buf, sc.Next())
-			hasvalue := false
-			for isDigit(sc.Peek()) {
-				writeChar(buf, sc.Next())
-				hasvalue = true
-			}
-			if !hasvalue {
-				return sc.Error(buf.String(), "illegal hexadecimal number")
-			}
-			return nil
-		} else if sc.Peek() != '.' && isDecimal(sc.Peek()) {
-			ch = sc.Next()
-		}*/
+		}
 	}
 	sc.scanDecimal(ch, buf)
 	if sc.Peek() == '.' {
@@ -198,7 +223,7 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) error {
 		sc.scanDecimal(sc.Next(), buf)
 	}
 
-	return nil
+	return 0, nil
 }
 
 func (sc *Scanner) scanString(quote int, buf *bytes.Buffer) error {
@@ -383,8 +408,7 @@ redo:
 		}
 	case isDecimal(ch):
 		tok.Type = TNumber
-		err = sc.scanNumber(ch, buf)
-		tok.Str = buf.String()
+		tok.Num, err = sc.scanNumber(ch, buf)
 	default:
 		switch ch {
 		case EOF:
@@ -484,8 +508,7 @@ redo:
 			switch {
 			case isDecimal(ch2):
 				tok.Type = TNumber
-				err = sc.scanNumber(ch, buf)
-				tok.Str = buf.String()
+				tok.Num, err = sc.scanNumber(ch, buf)
 			case ch2 == '.':
 				writeChar(buf, ch)
 				writeChar(buf, sc.Next())
@@ -499,7 +522,16 @@ redo:
 				tok.Type = '.'
 			}
 			tok.Str = buf.String()
-		case '+', '*', '%', '^', '#', '(', ')', '{', '}', ']', ';', ',', '&', '|':
+		case '+':
+			if sc.Peek() == '=' {
+				tok.Type = TCompAdd
+				tok.Str = "+="
+				sc.Next()
+			} else {
+				tok.Type = ch
+				tok.Str = string(ch)
+			}
+		case '*', '%', '^', '#', '(', ')', '{', '}', ']', ';', ',', '&', '|':
 			tok.Type = ch
 			tok.Str = string(ch)
 		default:
