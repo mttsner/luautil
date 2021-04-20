@@ -55,7 +55,7 @@ import (
 %token<token> TAnd TBreak TContinue TDo TElse TElseIf TEnd TFalse TFor TFunction TIf TIn TLocal TNil TNot TOr TReturn TRepeat TThen TTrue TUntil TWhile TGoto
 
 /* Literals */
-%token<token> TEqeq TNeq TLte TGte TFloorDiv TRshift TLshift T2Comma T3Comma T2Colon TIdent TNumber TString '{' '(' TCompAdd
+%token<token> TEqeq TNeq TLte TGte TFloorDiv TRshift TLshift T2Comma T3Comma T2Colon TIdent TNumber TString '{' '(' TCompound
 
 /* Operators */
 %left TOr
@@ -114,8 +114,8 @@ stat:
             $$ = &ast.AssignStmt{Lhs: $1, Rhs: $3}
             $$.SetLine($1[0].Line())
         } |
-        varlist TCompAdd exprlist {
-            $$ = &ast.CompoundAssignStmt{Operator: "+", Lhs: $1, Rhs: $3}
+        varlist TCompound exprlist {
+            $$ = &ast.CompoundAssignStmt{Operator: $2.Str, Lhs: $1, Rhs: $3}
             $$.SetLine($1[0].Line())
         } |
         /* 'stat = functioncal' causes a reduce/reduce conflict */
@@ -207,11 +207,7 @@ stat:
         TBreak  {
             $$ = &ast.BreakStmt{}
             $$.SetLine($1.Pos.Line)
-        } |
-        TContinue  {
-            $$ = &ast.ContinueStmt{}
-            $$.SetLine($1.Pos.Line)
-        } 
+        }
 
 elseifs: 
         {
@@ -230,7 +226,11 @@ laststat:
         TReturn exprlist {
             $$ = &ast.ReturnStmt{Exprs:$2}
             $$.SetLine($1.Pos.Line)
-        }
+        } |
+        TContinue  {
+            $$ = &ast.ContinueStmt{}
+            $$.SetLine($1.Pos.Line)
+        } 
 funcname: 
         funcname1 {
             $$ = $1

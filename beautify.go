@@ -305,6 +305,16 @@ func (s *someStruct) beautifyStmt(chunk []ast.Stmt) {
 				s.beautifyExpr(ex)
 				s.addComma(i, len(stmt.Rhs))
 			}
+		case *ast.CompoundAssignStmt:
+			for i, ex := range stmt.Lhs {
+				s.beautifyExpr(ex)
+				s.addComma(i, len(stmt.Lhs))
+			}
+			s.addpad(stmt.Operator)
+			for i, ex := range stmt.Rhs {
+				s.beautifyExpr(ex)
+				s.addComma(i, len(stmt.Rhs))
+			}
 		case *ast.LocalAssignStmt:
 			s.add("local ")
 			for i, name := range stmt.Names {

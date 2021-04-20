@@ -222,8 +222,8 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 		}
 		sc.scanDecimal(sc.Next(), buf)
 	}
-
-	return 0, nil
+	val, _ := strconv.ParseInt(buf.String(), 10, 64)
+	return float64(val), nil
 }
 
 func (sc *Scanner) scanString(quote int, buf *bytes.Buffer) error {
@@ -414,13 +414,19 @@ redo:
 		case EOF:
 			tok.Type = EOF
 		case '-':
-			if sc.Peek() == '-' {
+			ch2 := sc.Peek()
+			switch ch2 {
+			case '-':
 				err = sc.skipComments(sc.Next())
 				if err != nil {
 					goto finally
 				}
 				goto redo
-			} else {
+			case '=':
+				tok.Type = TCompound
+				tok.Str = "-="
+				sc.Next()
+			default:
 				tok.Type = ch
 				tok.Str = string(ch)
 			}
@@ -486,11 +492,17 @@ redo:
 				tok.Str = string(ch)
 			}
 		case '/':
-			if sc.Peek() == '/' {
+			ch2 := sc.Peek()
+			switch ch2 {
+			case '/':
 				tok.Type = TFloorDiv
 				tok.Str = "//"
 				sc.Next()
-			} else {
+			case '=':
+				tok.Type = TCompound
+				tok.Str = "/="
+				sc.Next()
+			default:
 				tok.Type = ch
 				tok.Str = string(ch)
 			}
@@ -512,10 +524,14 @@ redo:
 			case ch2 == '.':
 				writeChar(buf, ch)
 				writeChar(buf, sc.Next())
-				if sc.Peek() == '.' {
+				switch sc.Peek() {
+				case '.':
 					writeChar(buf, sc.Next())
 					tok.Type = T3Comma
-				} else {
+				case '=':
+					writeChar(buf, sc.Next())
+					tok.Type = TCompound
+				default:
 					tok.Type = T2Comma
 				}
 			default:
@@ -524,14 +540,41 @@ redo:
 			tok.Str = buf.String()
 		case '+':
 			if sc.Peek() == '=' {
-				tok.Type = TCompAdd
+				tok.Type = TCompound
 				tok.Str = "+="
 				sc.Next()
 			} else {
 				tok.Type = ch
 				tok.Str = string(ch)
 			}
-		case '*', '%', '^', '#', '(', ')', '{', '}', ']', ';', ',', '&', '|':
+		case '*':
+			if sc.Peek() == '=' {
+				tok.Type = TCompound
+				tok.Str = "*="
+				sc.Next()
+			} else {
+				tok.Type = ch
+				tok.Str = string(ch)
+			}
+		case '%':
+			if sc.Peek() == '=' {
+				tok.Type = TCompound
+				tok.Str = "%="
+				sc.Next()
+			} else {
+				tok.Type = ch
+				tok.Str = string(ch)
+			}
+		case '^':
+			if sc.Peek() == '=' {
+				tok.Type = TCompound
+				tok.Str = "^="
+				sc.Next()
+			} else {
+				tok.Type = ch
+				tok.Str = string(ch)
+			}
+		case '#', '(', ')', '{', '}', ']', ';', ',', '&', '|':
 			tok.Type = ch
 			tok.Str = string(ch)
 		default:
