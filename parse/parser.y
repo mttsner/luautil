@@ -2,7 +2,7 @@
 package parse
 
 import (
-  "github.com/notnoobmaster/beautifier/ast"
+  "github.com/notnoobmaster/luautil/ast"
 )
 %}
 %type<stmts> chunk
@@ -410,19 +410,19 @@ expr:
             $$.SetLine($1.Line())
         } |
         '-' expr %prec UNARY {
-            $$ = &ast.UnaryMinusOpExpr{Expr: $2}
+            $$ = &ast.UnaryOpExpr{Expr: $2, Operator: "-"}
             $$.SetLine($2.Line())
         } |
         TNot expr %prec UNARY {
-            $$ = &ast.UnaryNotOpExpr{Expr: $2}
+            $$ = &ast.UnaryOpExpr{Expr: $2, Operator: "not "}
             $$.SetLine($2.Line())
         } |
         '#' expr %prec UNARY {
-            $$ = &ast.UnaryLenOpExpr{Expr: $2}
+            $$ = &ast.UnaryOpExpr{Expr: $2, Operator: "#"}
             $$.SetLine($2.Line())
         } |
         '~' expr %prec UNARY {
-            $$ = &ast.UnaryBitwiseNotOpExpr{Expr: $2}
+            $$ = &ast.UnaryOpExpr{Expr: $2, Operator: "~"}
             $$.SetLine($2.Line())
         } 
 

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/notnoobmaster/beautifier/ast"
+	"github.com/notnoobmaster/luautil/ast"
 )
 
 const EOF = -1

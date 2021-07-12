@@ -1,7 +1,7 @@
-package beautifier
+package luautil
 
 import (
-	"github.com/yuin/gopher-lua/ast" 
+	"github.com/notnoobmaster/luautil/ast" 
 
 )
 
@@ -29,11 +29,7 @@ func (s *state) quickTraverseExpr(expr ast.Expr) {
 	case *ast.LogicalOpExpr:
 		s.quickTraverseExpr(ex.Lhs)
 		s.quickTraverseExpr(ex.Rhs)
-	case *ast.UnaryMinusOpExpr:
-		s.quickTraverseExpr(ex.Expr)
-	case *ast.UnaryNotOpExpr:
-		s.quickTraverseExpr(ex.Expr)
-	case *ast.UnaryLenOpExpr:
+	case *ast.UnaryOpExpr:
 		s.quickTraverseExpr(ex.Expr)
 	case *ast.FunctionExpr:
 		if s.match(ex.Stmts) {
@@ -95,17 +91,9 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 			}
 			return true
 		}
-	case *ast.UnaryMinusOpExpr:
-		if unary, ok := selector.(*ast.UnaryMinusOpExpr); ok {
+	case *ast.UnaryOpExpr:
+		if unary, ok := selector.(*ast.UnaryOpExpr); ok {
 			return s.exprEqual(ex.Expr, unary.Expr)
-		} 
-	case *ast.UnaryNotOpExpr:
-		if not, ok := selector.(*ast.UnaryNotOpExpr); ok {
-			return s.exprEqual(ex.Expr, not.Expr)
-		} 
-	case *ast.UnaryLenOpExpr:
-		if unaryLen, ok := selector.(*ast.UnaryLenOpExpr); ok {
-			return s.exprEqual(ex.Expr, unaryLen.Expr)
 		} 
 	case *ast.ArithmeticOpExpr:
 		if arith, ok := selector.(*ast.ArithmeticOpExpr); ok && ex.Operator == arith.Operator {

@@ -3,6 +3,7 @@ package ast
 type Stmt interface {
 	PositionHolder
 	stmtMarker()
+	String() string
 }
 
 type StmtBase struct {

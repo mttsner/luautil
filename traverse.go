@@ -1,455 +1,288 @@
-package beautifier
+package luautil
 
 import (
-	"github.com/notnoobmaster/beautifier/ast"
-	"github.com/yuin/gopher-lua"
+	"github.com/notnoobmaster/luautil/ast"
 )
 
-type constLValueExpr struct {
-	ast.ExprBase
-
-	Value lua.LValue
+type Handlers struct {
+	// Expressions
+	IdentExpr          func(*ast.IdentExpr) ast.Expr
+	UnaryOpExpr        func(*ast.UnaryOpExpr) ast.Expr
+	FuncCallExpr       func(*ast.FuncCallExpr) ast.Expr
+	AttrGetExpr        func(*ast.AttrGetExpr) ast.Expr
+	StringConcatOpExpr func(*ast.StringConcatOpExpr) ast.Expr
+	RelationalOpExpr   func(*ast.RelationalOpExpr) *ast.Expr
+	ArithmeticOpExpr   func(*ast.ArithmeticOpExpr) ast.Expr
+	LogicalOpExpr      func(*ast.LogicalOpExpr) ast.Expr
+	TableExpr          func(*ast.TableExpr) ast.Expr
+	FunctionExpr       func(*ast.FunctionExpr) ast.Expr
+	// Statements
+	WhileStmt          func(*ast.WhileStmt)
+	RepeatStmt         func(*ast.RepeatStmt)
+	DoBlockStmt        func(*ast.DoBlockStmt)
+	LocalAssignStmt    func(*ast.LocalAssignStmt)
+	FuncDefStmt        func(*ast.FuncDefStmt)
+	AssignStmt         func(*ast.AssignStmt)
+	ReturnStmt         func(*ast.ReturnStmt)
+	IfStmt             func(*ast.IfStmt)
+	NumberForStmt      func(*ast.NumberForStmt)
+	GenericForStmt     func(*ast.GenericForStmt)
+	CompoundAssignStmt func(*ast.CompoundAssignStmt)
+	LabelStmt          func(*ast.LabelStmt)
+	GotoStmt           func(*ast.GotoStmt)
+	BreakStmt          func()
+	ContinueStmt       func()
 }
 
-type functions struct {
-	NewScope func() func()
-	NewVariable func(variable string, remove func()) string
-	IdentExpr func(variable string) ast.Expr
-	//
-	UnaryMinusOpExpr func(expr *ast.UnaryMinusOpExpr) ast.Expr
-	UnaryNotOpExpr func(expr *ast.UnaryNotOpExpr) ast.Expr
-	UnaryLenOpExpr func(expr *ast.UnaryLenOpExpr) ast.Expr
-	//
-	FuncCallExpr func(expr *ast.FuncCallExpr) ast.Expr
-	AttrGetExpr func(expr *ast.AttrGetExpr) ast.Expr
-	//
-	StringConcatOpExpr func(left *ast.Expr, right *ast.Expr) ast.Expr
-	RelationalOpExpr func(expr *ast.RelationalOpExpr) *ast.Expr
-	ArithmeticOpExpr func(operator string, left *ast.Expr, right *ast.Expr) ast.Expr
-	LogicalOpExpr func(*ast.LogicalOpExpr) ast.Expr
-	//
-	WhileStmt func(stmt *ast.WhileStmt)
-	RepeatStmt func(stmt *ast.RepeatStmt)
-	DoBlockStmt func(stmt *ast.DoBlockStmt)
-	LocalAssignStmt func(stmt *ast.LocalAssignStmt)
-	FuncDefStmt func(stmt *ast.FuncDefStmt)
-	AssignStmt func(stmt *ast.AssignStmt)
-	ReturnStmt func(stmt *ast.ReturnStmt)
-	IfStmt func(stmt *ast.IfStmt)
-	NumberForStmt func(stmt *ast.NumberForStmt)
-	GenericForStmt func(stmt *ast.GenericForStmt)
-	FuncCallStmt func(expr *ast.FuncCallExpr)
-	BreakStmt func()
-}
-
-func (Functions *functions) compileTableExpr(expr *ast.TableExpr, ret *ast.Expr) *ast.Expr {
-	for _, field := range expr.Fields {
-		if field.Key != nil {
-			field.Key = *Functions.compileExpr(&field.Key)
-		}
-		field.Value = *Functions.compileExpr(&field.Value)
-	}
-	return ret
-}
-
-func (Functions *functions) compileUnaryOpExpr(exprs *ast.Expr) *ast.Expr {
-	switch ex := (*exprs).(type) {
-	case *ast.UnaryMinusOpExpr:
-		ex.Expr = *Functions.compileExpr(&ex.Expr)
-		if Functions.UnaryMinusOpExpr != nil {
-			if ret := Functions.UnaryMinusOpExpr(ex); ret != nil {
-				return &ret
-			}
-		}
-	case *ast.UnaryNotOpExpr:
-		ex.Expr = *Functions.compileExpr(&ex.Expr)
-		if Functions.UnaryNotOpExpr != nil {
-			if ret := Functions.UnaryNotOpExpr(ex); ret != nil {
-				return &ret
-			}
-		}
-	case *ast.UnaryLenOpExpr:
-		ex.Expr = *Functions.compileExpr(&ex.Expr)
-		if Functions.UnaryLenOpExpr != nil {
-			if ret := Functions.UnaryLenOpExpr(ex); ret != nil {
-				return &ret
-			}
-		}
-	}
-	return exprs
-}
-
-func (Functions *functions) compileRelationalOpExpr(expr *ast.RelationalOpExpr, ret *ast.Expr) *ast.Expr {
-	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
-	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
-	if Functions.RelationalOpExpr != nil {
-		if ex := Functions.RelationalOpExpr(expr); ex != nil {
-			return ex
-		}
-	}
-	return ret
-}
-
-func (Functions *functions) compileArithmeticOpExpr(expr *ast.ArithmeticOpExpr, ret *ast.Expr) *ast.Expr {
-	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
-	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
-	if Functions.ArithmeticOpExpr != nil {
-		if ex := Functions.ArithmeticOpExpr(expr.Operator, &expr.Lhs, &expr.Rhs); ex != nil {
-			return &ex
-		}
-	}
-	return ret
-}
-
-func (Functions *functions) compileStringConcatOpExpr(expr *ast.StringConcatOpExpr, ret *ast.Expr) *ast.Expr {
-	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
-	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
-	if Functions.StringConcatOpExpr != nil {
-		if ex := Functions.StringConcatOpExpr(&expr.Lhs, &expr.Rhs); ex != nil {
-			return &ex
-		}
-	}
-	return ret
-}
-
-func (Functions *functions) compileLogicalOpExpr(expr *ast.LogicalOpExpr, ret *ast.Expr) *ast.Expr {
-	expr.Lhs = *Functions.compileExpr(&expr.Lhs)
-	expr.Rhs = *Functions.compileExpr(&expr.Rhs)
-	if Functions.LogicalOpExpr != nil {
-		if ex := Functions.LogicalOpExpr(expr); ex != nil {
-			return &ex
-		}
-	}
-	return ret
-}
-
-func (Functions *functions) compileFunctionExpr(expr *ast.FunctionExpr) {
-	endScope := Functions.startScope()
-	if Functions.NewVariable != nil {
-		for i, name := range expr.ParList.Names {
-			expr.ParList.Names[i] = Functions.NewVariable(name, func(){})
-		}
-	}
-	if Functions.FuncCallStmt != nil {
-		return 
-	}
-	Functions.Traverse(expr.Stmts)
-	endScope()
-}
-
-func (Functions *functions) compileFuncCallExpr(expr *ast.FuncCallExpr, ret *ast.Expr) *ast.Expr {
-	for i, arg := range expr.Args {
-		expr.Args[i] = *Functions.compileExpr(&arg)
-	}
-	if Functions.FuncCallExpr != nil {
-		if ex := Functions.FuncCallExpr(expr); ex != nil {
-			return &ex
-		}
-	}
-	if expr.Func != nil { // hoge.func()
-		expr.Func = *Functions.compileExpr(&expr.Func)
-	} else { // hoge:method()
-		expr.Receiver = *Functions.compileExpr(&expr.Receiver)
-	}
-	return ret
-}
-
-func (Functions *functions) compileIdentExpr(expr *ast.IdentExpr, ret *ast.Expr) *ast.Expr {
-	if Functions.IdentExpr != nil {
-		if ex := Functions.IdentExpr(expr.Value); ex != nil {
-			return &ex
-		}
-	}
-	return ret
-}
-
-func (Functions *functions) compileAttrGetExpr(expr *ast.AttrGetExpr, ret *ast.Expr) *ast.Expr {
-	expr.Key = *Functions.compileExpr(&expr.Key)
-	if Functions.AttrGetExpr != nil {
-		if ex := Functions.AttrGetExpr(expr); ex != nil {
-			return &ex
-		} 
-	}
-	expr.Object = *Functions.compileExpr(&expr.Object)
-	return ret 
-}
-
-
-func (Functions *functions) compileExpr(expr *ast.Expr) *ast.Expr {
-	switch ex := (*expr).(type) {
-	case *ast.StringExpr:
-
-	case *ast.NumberExpr:
-		
-	case *ast.NilExpr:
-
-	case *ast.FalseExpr:
-
-	case *ast.TrueExpr:
-
+func (h *Handlers) expr(ex *ast.Expr) *ast.Expr {
+	switch e := (*ex).(type) {
 	case *ast.IdentExpr:
-		return Functions.compileIdentExpr(ex, expr)
-	case *ast.Comma3Expr:
-
+		if h.IdentExpr != nil {
+			if ex := h.IdentExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.AttrGetExpr:
-		return Functions.compileAttrGetExpr(ex, expr)
+		e.Key = *h.expr(&e.Key)
+		e.Object = *h.expr(&e.Object)
+		if h.AttrGetExpr != nil {
+			if ex := h.AttrGetExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.TableExpr:
-		return Functions.compileTableExpr(ex, expr)
+		for _, field := range e.Fields {
+			if field.Key != nil {
+				field.Key = *h.expr(&field.Key)
+			}
+			field.Value = *h.expr(&field.Value)
+		}
+		if h.TableExpr != nil {
+			if ex := h.TableExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.ArithmeticOpExpr:
-		return Functions.compileArithmeticOpExpr(ex, expr)
+		e.Lhs = *h.expr(&e.Lhs)
+		e.Rhs = *h.expr(&e.Rhs)
+		if h.ArithmeticOpExpr != nil {
+			if ex := h.ArithmeticOpExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.StringConcatOpExpr:
-		return Functions.compileStringConcatOpExpr(ex, expr)
-	case *ast.UnaryMinusOpExpr, *ast.UnaryNotOpExpr, *ast.UnaryLenOpExpr:
-		return Functions.compileUnaryOpExpr(expr)
+		e.Lhs = *h.expr(&e.Lhs)
+		e.Rhs = *h.expr(&e.Rhs)
+		if h.StringConcatOpExpr != nil {
+			if ex := h.StringConcatOpExpr(e); ex != nil {
+				return &ex
+			}
+		}
+	case *ast.UnaryOpExpr:
+		e.Expr = *h.expr(&e.Expr)
+		if h.UnaryOpExpr != nil {
+			if ret := h.UnaryOpExpr(e); ret != nil {
+				return &ret
+			}
+		}
 	case *ast.RelationalOpExpr:
-		return Functions.compileRelationalOpExpr(ex, expr)
+		e.Lhs = *h.expr(&e.Lhs)
+		e.Rhs = *h.expr(&e.Rhs)
+		if h.RelationalOpExpr != nil {
+			if ex := h.RelationalOpExpr(e); ex != nil {
+				return ex
+			}
+		}
 	case *ast.LogicalOpExpr:
-		return Functions.compileLogicalOpExpr(ex, expr)
+		e.Lhs = *h.expr(&e.Lhs)
+		e.Rhs = *h.expr(&e.Rhs)
+		if h.LogicalOpExpr != nil {
+			if ex := h.LogicalOpExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.FuncCallExpr:
-		return Functions.compileFuncCallExpr(ex, expr)
+		for i, arg := range e.Args {
+			e.Args[i] = *h.expr(&arg)
+		}
+		if h.FuncCallExpr != nil {
+			if ex := h.FuncCallExpr(e); ex != nil {
+				return &ex
+			}
+		}
+		if e.Func != nil { // hoge.func()
+			e.Func = *h.expr(&e.Func)
+		} else { // hoge:method()
+			e.Receiver = *h.expr(&e.Receiver)
+		}
+
+		if h.FuncCallExpr != nil {
+			if ex := h.FuncCallExpr(e); ex != nil {
+				return &ex
+			}
+		}
 	case *ast.FunctionExpr:
-		Functions.compileFunctionExpr(ex)
-	}
-	return expr
-}
-
-func (Functions *functions) compileAssignStmt(stmt *ast.AssignStmt) {
-	for i := range stmt.Lhs {
-		if ex := Functions.compileExpr(&stmt.Lhs[i]); ex != nil {
-			stmt.Lhs[i] = *ex
-		}
-	}
-	for i := range stmt.Rhs {
-		if ex := Functions.compileExpr(&stmt.Rhs[i]); ex != nil {
-			stmt.Rhs[i] = *ex
-		}
-	}
-	if Functions.AssignStmt != nil {
-		Functions.AssignStmt(stmt)
-	}
-}
-
-
-func (Functions *functions) compileLocalAssignStmt(stmt *ast.LocalAssignStmt) {
-	if len(stmt.Exprs) > 0 {
-		for i, expr := range stmt.Exprs {
-			stmt.Exprs[i] = *Functions.compileExpr(&expr)
-		}
-	}
-	if Functions.NewVariable != nil {
-		for i, name := range stmt.Names {
-			stmt.Names[i] = Functions.NewVariable(name, func(){
-				stmt.Names = append(stmt.Names[:i], stmt.Names[i+1:]...)
-				if len(stmt.Exprs) > i {
-					stmt.Exprs = append(stmt.Exprs[:i], stmt.Exprs[i+1:]...)
-				}
-			})
-		}
-	}
-	if Functions.LocalAssignStmt != nil {
-		Functions.LocalAssignStmt(stmt)
-	}
-}
-
-func (Functions *functions) compileReturnStmt(stmt *ast.ReturnStmt) {
-	for i := range stmt.Exprs {
-		if ex := Functions.compileExpr(&stmt.Exprs[i]); ex != nil {
-			stmt.Exprs[i] = *ex
-		}
-	}
-	if Functions.ReturnStmt != nil {
-		Functions.ReturnStmt(stmt)
-	}
-}
-// USELESS
-func (Functions *functions) compileBranchCondition(expr ast.Expr) {
-	switch ex := expr.(type) {
-	case *ast.UnaryNotOpExpr:
-		Functions.compileBranchCondition(ex.Expr)
-	case *ast.LogicalOpExpr:
-		Functions.compileBranchCondition(ex.Lhs)
-		Functions.compileBranchCondition(ex.Rhs)
-	case *ast.RelationalOpExpr:
-		Functions.compileExpr(&ex.Lhs)
-		Functions.compileExpr(&ex.Rhs)
-	default:
-		Functions.compileExpr(&expr)
-	}
-}
-
-
-func (Functions *functions) compileIfStmt(stmt *ast.IfStmt) {
-	if ex := Functions.compileExpr(&stmt.Condition); ex != nil {
-		stmt.Condition = *Functions.compileExpr(&stmt.Condition)
-	}
-	if Functions.IfStmt != nil {
-		if len(stmt.Else) > 0 {
-			Functions.IfStmt(stmt)
+		if h.FunctionExpr != nil {
+			h.FunctionExpr(e)
 		} else {
-			Functions.IfStmt(stmt)
-		}
-	} else{
-		endScope := Functions.startScope()
-		Functions.Traverse(stmt.Then)
-		endScope()
-		if len(stmt.Else) > 0 {
-			endScope = Functions.startScope()
-			Functions.Traverse(stmt.Else)
-			endScope()
+			h.Traverse(e.Stmts)
 		}
 	}
+	return ex
 }
 
-func (Functions *functions) compileNumberForStmt(stmt *ast.NumberForStmt) {
-	if ex := Functions.compileExpr(&stmt.Init); ex != nil {
-		stmt.Init = *ex
-	}
-	if ex := Functions.compileExpr(&stmt.Limit); ex != nil {
-		stmt.Limit = *ex
-	}
-	if stmt.Step != nil {
-		if ex := Functions.compileExpr(&stmt.Step); ex != nil {
-			stmt.Step = *ex
-		}
-	}
-	endScope := Functions.startScope()
-	if Functions.NewVariable != nil {
-		stmt.Name = Functions.NewVariable(stmt.Name, func(){})
-	}
-	if Functions.NumberForStmt != nil {
-		Functions.NumberForStmt(stmt)
-	} else {
-		Functions.Traverse(stmt.Stmts)
-		endScope()
-	}
-}
-
-func (Functions *functions) compileGenericForStmt(stmt *ast.GenericForStmt) {
-	for i := range stmt.Exprs {
-		if ex := Functions.compileExpr(&stmt.Exprs[i]); ex != nil {
-			stmt.Exprs[i] = *ex
-		}
-	}
-	endScope := Functions.startScope()
-	if Functions.NewVariable != nil {
-		for i, name := range stmt.Names {
-			stmt.Names[i] = Functions.NewVariable(name, func(){})
-		}
-	}
-	if Functions.GenericForStmt != nil {
-		Functions.GenericForStmt(stmt)
-	} else {
-		Functions.Traverse(stmt.Stmts)
-		endScope()
-	}
-}
-
-func (Functions *functions) compileFuncDefStmt(stmt *ast.FuncDefStmt) {
-	if stmt.Name.Func == nil {
-		if ex := Functions.compileExpr(&stmt.Name.Receiver); ex != nil {
-			stmt.Name.Receiver = *ex
-		}
-		if ex := Functions.compileExpr(&[]ast.Expr{stmt.Func}[0]); ex != nil { // This is scuffed af
-			//stmt.Func = *ex
-			panic("figure this shit out")
-		}
-	} else {
-		astmt := &ast.AssignStmt{Lhs: []ast.Expr{stmt.Name.Func}, Rhs: []ast.Expr{stmt.Func}}
-		Functions.compileAssignStmt(astmt)
-	}
-	if Functions.FuncDefStmt != nil {
-		Functions.FuncDefStmt(stmt)
-	}
-}
-
-func (Functions *functions) compileRepeatStmt(stmt *ast.RepeatStmt) {
-	if ex := Functions.compileExpr(&stmt.Condition); ex != nil {
-		stmt.Condition = *Functions.compileExpr(&stmt.Condition)
-	}
-	if Functions.RepeatStmt != nil {
-		Functions.RepeatStmt(stmt)
-	} else {
-		endScope := Functions.startScope()
-		Functions.Traverse(stmt.Stmts)
-		endScope()
-	}
-}
-
-func (Functions *functions) compileWhileStmt(stmt *ast.WhileStmt) {
-	if ex := Functions.compileExpr(&stmt.Condition); ex != nil {
-		stmt.Condition = *Functions.compileExpr(&stmt.Condition)
-	}
-	if Functions.WhileStmt != nil {
-		Functions.WhileStmt(stmt)
-	} else {
-		endScope := Functions.startScope()
-		Functions.Traverse(stmt.Stmts)
-		endScope()
-	}
-}
-
-func (Functions *functions) startScope() func() {
-	if Functions.NewScope != nil {
-		return Functions.NewScope()
-	}
-	return func(){}
-}
-
-func (Functions *functions) compileDoBlockStmt(stmt *ast.DoBlockStmt) {
-	if Functions.DoBlockStmt != nil {
-		Functions.DoBlockStmt(stmt)
-	} else {
-		endScope := Functions.startScope()
-		Functions.Traverse(stmt.Stmts)
-		endScope()
-	}
-}
-
-func (Functions *functions) compileBreakStmt() {
-	if Functions.BreakStmt != nil {
-		Functions.BreakStmt()
-	}
-}
-
-func (Functions *functions) compileFuncCallStmt(stmt *ast.FuncCallStmt) {
-	Functions.compileFuncCallExpr(stmt.Expr.(*ast.FuncCallExpr), nil)
-	if Functions.FuncCallStmt != nil {
-		Functions.FuncCallStmt(stmt.Expr.(*ast.FuncCallExpr))
-	}
-}
-
-func (Functions *functions) compileStmt(chunk []ast.Stmt) {
+func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 	for _, stmt := range chunk {
-		switch st := stmt.(type) {
+		switch s := stmt.(type) {
 		case *ast.AssignStmt:
-			Functions.compileAssignStmt(st)
+			for i := range s.Lhs {
+				if ex := h.expr(&s.Lhs[i]); ex != nil {
+					s.Lhs[i] = *ex
+				}
+			}
+			for i := range s.Rhs {
+				if ex := h.expr(&s.Rhs[i]); ex != nil {
+					s.Rhs[i] = *ex
+				}
+			}
+			if h.AssignStmt != nil {
+				h.AssignStmt(s)
+			}
+		case *ast.CompoundAssignStmt:
+			for i := range s.Lhs {
+				if ex := h.expr(&s.Lhs[i]); ex != nil {
+					s.Lhs[i] = *ex
+				}
+			}
+			for i := range s.Rhs {
+				if ex := h.expr(&s.Rhs[i]); ex != nil {
+					s.Rhs[i] = *ex
+				}
+			}
+			if h.CompoundAssignStmt != nil {
+				h.CompoundAssignStmt(s)
+			}
 		case *ast.LocalAssignStmt:
-			Functions.compileLocalAssignStmt(st)
+			if len(s.Exprs) > 0 {
+				for i, e := range s.Exprs {
+					s.Exprs[i] = *h.expr(&e)
+				}
+			}
+			if h.LocalAssignStmt != nil {
+				h.LocalAssignStmt(s)
+			}
 		case *ast.FuncCallStmt:
-			Functions.compileFuncCallStmt(st)
+			h.expr(&s.Expr)
 		case *ast.DoBlockStmt:
-			Functions.compileDoBlockStmt(st)
+			if h.DoBlockStmt != nil {
+				h.DoBlockStmt(s)
+			} else {
+				h.Traverse(s.Stmts)
+			}
 		case *ast.WhileStmt:
-			Functions.compileWhileStmt(st)
+			if ex := h.expr(&s.Condition); ex != nil {
+				s.Condition = *ex
+			}
+			if h.WhileStmt != nil {
+				h.WhileStmt(s)
+			} else {
+				h.Traverse(s.Stmts)
+			}
 		case *ast.RepeatStmt:
-			Functions.compileRepeatStmt(st)
+			if ex := h.expr(&s.Condition); ex != nil {
+				s.Condition = *ex
+			}
+			if h.RepeatStmt != nil {
+				h.RepeatStmt(s)
+			} else {
+				h.Traverse(s.Stmts)
+			}
 		case *ast.FuncDefStmt:
-			Functions.compileFuncDefStmt(st)
+			if s.Name.Func == nil {
+				if ex := h.expr(&s.Name.Receiver); ex != nil {
+					s.Name.Receiver = *ex
+				}
+				if ex := h.expr(&[]ast.Expr{s.Func}[0]); ex != nil { // This is scuffed af
+					//stmt.Func = *ex
+					panic("figure this shit out")
+				}
+			} else {
+				//astmt := &ast.AssignStmt{Lhs: []ast.Expr{s.Name.Func}, Rhs: []ast.Expr{s.Func}}
+				//h.compileAssignStmt(astmt)
+				panic("figure this shit out")
+			}
+			if h.FuncDefStmt != nil {
+				h.FuncDefStmt(s)
+			}
 		case *ast.ReturnStmt:
-			Functions.compileReturnStmt(st)
+			for i := range s.Exprs {
+				if ex := h.expr(&s.Exprs[i]); ex != nil {
+					s.Exprs[i] = *ex
+				}
+			}
+			if h.ReturnStmt != nil {
+				h.ReturnStmt(s)
+			}
 		case *ast.IfStmt:
-			Functions.compileIfStmt(st)
+			if ex := h.expr(&s.Condition); ex != nil {
+				s.Condition = *ex
+			}
+			if h.IfStmt != nil {
+				if len(s.Else) > 0 {
+					h.IfStmt(s)
+				} else {
+					h.IfStmt(s)
+				}
+			}
 		case *ast.BreakStmt:
-			Functions.compileBreakStmt()
+			if h.BreakStmt != nil {
+				h.BreakStmt()
+			}
 		case *ast.NumberForStmt:
-			Functions.compileNumberForStmt(st)
+			if ex := h.expr(&s.Init); ex != nil {
+				s.Init = *ex
+			}
+			if ex := h.expr(&s.Limit); ex != nil {
+				s.Limit = *ex
+			}
+			if s.Step != nil {
+				if ex := h.expr(&s.Step); ex != nil {
+					s.Step = *ex
+				}
+			}
+			if h.NumberForStmt != nil {
+				h.NumberForStmt(s)
+			} else {
+				h.Traverse(s.Stmts)
+			}
 		case *ast.GenericForStmt:
-			Functions.compileGenericForStmt(st)
+			for i := range s.Exprs {
+				if ex := h.expr(&s.Exprs[i]); ex != nil {
+					s.Exprs[i] = *ex
+				}
+			}
+			if h.GenericForStmt != nil {
+				h.GenericForStmt(s)
+			} else {
+				h.Traverse(s.Stmts)
+			}
+		case *ast.ContinueStmt:
+			if h.ContinueStmt != nil {
+				h.ContinueStmt()
+			}
+		case *ast.LabelStmt:
+			if h.LabelStmt != nil {
+				h.LabelStmt(s)
+			}
+		case *ast.GotoStmt:
+			if h.GotoStmt != nil {
+				h.GotoStmt(s)
+			}
 		}
 	}
 }
 
-// Traverse mhm
-func (Functions *functions) Traverse(ast []ast.Stmt) {
-	Functions.compileStmt(ast)
+// Traverse Abstract Syntax Tree
+func (h *Handlers) Traverse(ast []ast.Stmt) {
+	h.compileStmt(ast)
 }
