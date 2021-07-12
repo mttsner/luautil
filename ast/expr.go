@@ -3,6 +3,7 @@ package ast
 type Expr interface {
 	PositionHolder
 	exprMarker()
+	String() string
 }
 
 type ExprBase struct {
@@ -114,23 +115,10 @@ type ArithmeticOpExpr struct {
 	Rhs      Expr
 }
 
-type UnaryMinusOpExpr struct {
+type UnaryOpExpr struct {
 	ExprBase
-	Expr Expr
-}
 
-type UnaryNotOpExpr struct {
-	ExprBase
-	Expr Expr
-}
-
-type UnaryLenOpExpr struct {
-	ExprBase
-	Expr Expr
-}
-
-type UnaryBitwiseNotOpExpr struct {
-	ExprBase
+	Operator string
 	Expr Expr
 }
 

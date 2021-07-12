@@ -5,7 +5,7 @@ package parse
 import __yyfmt__ "fmt"
 
 import (
-	"github.com/notnoobmaster/beautifier/ast"
+	"github.com/notnoobmaster/luautil/ast"
 )
 
 type yySymType struct {
@@ -1270,22 +1270,22 @@ yynewstate:
 		}
 	case 74:
 		{
-			yyVAL.expr = &ast.UnaryMinusOpExpr{Expr: yyS[yypt-0].expr}
+			yyVAL.expr = &ast.UnaryOpExpr{Expr: yyS[yypt-0].expr, Operator: "-"}
 			yyVAL.expr.SetLine(yyS[yypt-0].expr.Line())
 		}
 	case 75:
 		{
-			yyVAL.expr = &ast.UnaryNotOpExpr{Expr: yyS[yypt-0].expr}
+			yyVAL.expr = &ast.UnaryOpExpr{Expr: yyS[yypt-0].expr, Operator: "not "}
 			yyVAL.expr.SetLine(yyS[yypt-0].expr.Line())
 		}
 	case 76:
 		{
-			yyVAL.expr = &ast.UnaryLenOpExpr{Expr: yyS[yypt-0].expr}
+			yyVAL.expr = &ast.UnaryOpExpr{Expr: yyS[yypt-0].expr, Operator: "#"}
 			yyVAL.expr.SetLine(yyS[yypt-0].expr.Line())
 		}
 	case 77:
 		{
-			yyVAL.expr = &ast.UnaryBitwiseNotOpExpr{Expr: yyS[yypt-0].expr}
+			yyVAL.expr = &ast.UnaryOpExpr{Expr: yyS[yypt-0].expr, Operator: "~"}
 			yyVAL.expr.SetLine(yyS[yypt-0].expr.Line())
 		}
 	case 78:

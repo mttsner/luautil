@@ -1,23 +1,47 @@
-package beautifier
+package luautil 
 
 import (
-	"os"
-	"strings"
 	"testing"
-	_ "embed"
+	"strings"
 
-	"github.com/notnoobmaster/beautifier/parse"
+	"github.com/notnoobmaster/luautil/parse"
+	"github.com/notnoobmaster/luautil/ast"
 )
 
+var optimizeTest = `
+	local _ = 1+2
+	local _ = 1-2
+	local _ = 1*2
+	local _ = 1/2
+	local _ = 1%2
+	local _ = 1^2
+	local _ = "a".."z"
+	local _ = true and false
+	local _ = true or false
+`
+
+var optimizeTarget = `local _ = 3;
+local _ = -1;
+local _ = 2;
+local _ = 0.5;
+local _ = 1;
+local _ = 1;
+local _ = "az";
+local _ = false;
+local _ = true;
+`
+
+
+
 func TestOptimize(t *testing.T) {
-	chunk, err := parse.Parse(strings.NewReader(test), "")
+	chunk, err := parse.Parse(strings.NewReader(optimizeTest), "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	
-	Optimize(chunk)
-	
-	file, err := os.Create("tests/optimized.lua")
 
-	file.WriteString(Beautify(chunk))
+	Optimize(chunk)
+
+	if ast.Beautify(chunk) != optimizeTarget {
+		t.Error("Test failed")
+	}
 }

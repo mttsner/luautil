@@ -1,11 +1,10 @@
-package beautifier
+package luautil
 
 import (
 	"strings"
 	"testing"
 
-	//"github.com/yuin/gopher-lua/ast"
-	"github.com/yuin/gopher-lua/parse"
+	"github.com/notnoobmaster/luautil/parse"
 )
 
 const target = `
