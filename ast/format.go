@@ -166,7 +166,7 @@ func (s *builder) expr(ex Expr) {
 		s.Data = &data{} // Reset the data
 	case *UnaryOpExpr:
 		// Skidded from luamin.js
-		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction == true) {
+		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction) {
 			s.Data = &data{Precedence: 8}
 			s.add("(" + e.Operator)
 			s.expr(ex)
@@ -210,7 +210,7 @@ func (s *builder) expr(ex Expr) {
 			s.add("...")
 		}
 		s.addln(")")
-		s.stmtList(e.Stmts)
+		s.chunk(e.Chunk)
 		s.tab().add("end")
 	}
 }
@@ -221,18 +221,18 @@ func (s *builder) elseBody(elseStmt []Stmt) {
 			s.tab().add("elseif ")
 			s.expr(elseif.Condition)
 			s.addln(" then")
-			s.stmtList(elseif.Then)
+			s.chunk(elseif.Then)
 			s.elseBody(elseif.Else)
 		} else {
 			s.tab().addln("else")
-			s.stmtList(elseStmt)
+			s.chunk(elseStmt)
 		}
 	}
 }
 
-func (b *builder) stmtList(stmts []Stmt) {
+func (b *builder) chunk(c Chunk) {
 	b.Indent++
-	for _, s := range stmts {
+	for _, s := range c {
 		b.stmt(s)
 	}
 	b.Indent--
@@ -297,17 +297,17 @@ func (s *builder) stmt(st Stmt) {
 		s.add(")")
 	case *DoBlockStmt:
 		s.addln("do")
-		s.stmtList(stmt.Stmts)
+		s.chunk(stmt.Chunk)
 		s.tab().add("end")
 	case *WhileStmt:
 		s.add("while ")
 		s.expr(stmt.Condition)
 		s.addln(" do")
-		s.stmtList(stmt.Stmts)
+		s.chunk(stmt.Chunk)
 		s.tab().add("end")
 	case *RepeatStmt:
 		s.addln("repeat")
-		s.stmtList(stmt.Stmts)
+		s.chunk(stmt.Chunk)
 		s.tab().add("until ")
 		s.expr(stmt.Condition)
 	case *FuncDefStmt:
@@ -325,7 +325,7 @@ func (s *builder) stmt(st Stmt) {
 			s.addcomma(i, len(stmt.Func.ParList.Names))
 		}
 		s.addln(")")
-		s.stmtList(stmt.Func.Stmts)
+		s.chunk(stmt.Func.Chunk)
 		s.tab().add("end")
 	case *ReturnStmt:
 		s.add("return ")
@@ -337,7 +337,7 @@ func (s *builder) stmt(st Stmt) {
 		s.add("if ")
 		s.expr(stmt.Condition)
 		s.addln(" then")
-		s.stmtList(stmt.Then)
+		s.chunk(stmt.Then)
 		s.elseBody(stmt.Else)
 		s.tab().add("end")
 	case *BreakStmt:
@@ -356,7 +356,7 @@ func (s *builder) stmt(st Stmt) {
 			s.expr(stmt.Step)
 		}
 		s.addln(" do")
-		s.stmtList(stmt.Stmts)
+		s.chunk(stmt.Chunk)
 		s.tab().add("end")
 	case *GenericForStmt:
 		s.add("for ")
@@ -369,20 +369,9 @@ func (s *builder) stmt(st Stmt) {
 			s.expr(ex)
 		}
 		s.addln(" do")
-		s.stmtList(stmt.Stmts)
+		s.chunk(stmt.Chunk)
 		s.tab().add("end")
 	}
 	s.add(";\n")
 
-}
-
-// Beautify the Abstract Syntax Tree
-func Beautify(ast []Stmt) string {
-	s := &builder{
-		Str:    &strings.Builder{},
-		Data:   &data{},
-		Indent: -1, // Accounting for the fact that each stmtList call increments Indent by one
-	}
-	s.stmtList(ast)
-	return s.Str.String()
 }

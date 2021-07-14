@@ -3,7 +3,6 @@ package luautil
 import (
 	"io"
 
-	"github.com/notnoobmaster/luautil/ast"
 	"github.com/notnoobmaster/luautil/parse"
 )
 
@@ -12,5 +11,5 @@ func Beautify(input io.Reader) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ast.Beautify(chunk), nil
+	return chunk.String(), nil
 }

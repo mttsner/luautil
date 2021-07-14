@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/notnoobmaster/luautil/ast"
 )
@@ -121,17 +120,6 @@ func (b *BasicBlock) removePred(p *BasicBlock) {
 	}
 }
 
-// Destinations associated with unlabelled for/switch/select stmts.
-// We push/pop one of these as we enter/leave each construct and for
-// each BranchStmt we scan for the innermost target of the right type.
-//
-type targets struct {
-	tail         *targets // rest of stack
-	_break       *BasicBlock
-	_continue    *BasicBlock
-	_fallthrough *BasicBlock
-}
-
 // Destinations associated with a labelled block.
 // We populate these as labels are encountered in forward gotos or
 // labelled statements.
@@ -162,27 +150,6 @@ func (f *Function) startBody() {
 	f.currentBlock = f.newBasicBlock("entry")
 }
 
-type setNumable interface {
-	setNum(int)
-}
-
-// numberRegisters assigns numbers to all SSA registers
-// (value-defining Instructions) in f, to aid debugging.
-// (Non-Instruction Values are named at construction.)
-//
-func numberRegisters(f *Function) {
-	v := 0
-	for _, b := range f.Blocks {
-		for _, instr := range b.Instrs {
-			switch instr.(type) {
-			case Value:
-				instr.(setNumable).setNum(v)
-				v++
-			}
-		}
-	}
-}
-
 // buildReferrers populates the def/use information in all non-nil
 // Value.Referrers slice.
 // Precondition: all such slices are initially empty.
@@ -206,40 +173,9 @@ func buildReferrers(f *Function) {
 func (f *Function) finishBody() {
 	f.currentBlock = nil
 
-	// Remove from f.Locals any Allocs that escape to the heap.
-	j := 0
-	// Nil out f.Locals[j:] to aid GC.
-	for i := j; i < len(f.Locals); i++ {
-		f.Locals[i] = nil
-	}
-	f.Locals = f.Locals[:j]
-
-	optimizeBlocks(f)
-
 	buildReferrers(f)
 
-	buildDomTree(f)
-
-	if f.Prog.mode&NaiveForm == 0 {
-		// For debugging pre-state of lifting pass:
-		// numberRegisters(f)
-		// f.WriteTo(os.Stderr)
-		lift(f)
-	}
-
-	f.namedResults = nil // (used by lifting)
-
-	numberRegisters(f)
-
-	if f.Prog.mode&PrintFunctions != 0 {
-		printMu.Lock()
-		f.WriteTo(os.Stdout)
-		printMu.Unlock()
-	}
-
-	if f.Prog.mode&SanityCheckFunctions != 0 {
-		mustSanityCheck(f, nil)
-	}
+	lift(f)
 }
 
 // removeNilBlocks eliminates nils from f.Blocks and updates each
@@ -331,108 +267,42 @@ func (f *Function) addCompoundAssign(op string, lhs ast.Expr, value Value) {
 }
 
 
-func (f *Function) addAssign(lhs ast.Expr, value Value) {
-	switch ex := lhs.(type) {
-	case *ast.IdentExpr:
-		f.emit(&Assign{
-			Lhs: f.lookup(ex.Value),
-			Rhs: value,
-		})
-	default:
-		panic("Assignment to unimplemented expression")
-	}
+func (f *Function) addAssign(lhs Value, rhs Value) {
+	f.emit(&Assign{
+		Lhs: lhs,
+		Rhs: rhs,
+	})
 }
 
 func (f *Function) addLocalAssign(name string, value Value) {
-	f.Locals = append(f.Locals, v)
-	f.Names[name] = v
-	f.emit(&Local{
-		Comment: value,
-		Value: value,
-	}) //TODO add missing method to Local
+	local := &Local{Comment: name}
+
+	switch value.(type) {
+	case Nil, False, True, Number, String:
+		local.Value = value
+	default:
+		local.Value = Nil{}
+		f.emit(&Assign{
+			Lhs: local,
+			Rhs: value,
+		})
+	}
+	f.Locals = append(f.Locals, local)
+	f.Names[name] = local
 }
 
-func (f *Function) lookup(name string) Local {
+func (f *Function) lookup(name string) Value {
 	if v, ok := f.Names[name]; ok {
 		return v
 	}
-	// Definition must be in an enclosing function;
-	// plumb it through intervening closures.
 	if f.parent == nil {
-		panic("no ssa.Value for " + name)
+		return f.Globals[name]
 	}
 	return f.parent.lookup(name)
 }
 // emit emits the specified instruction to function f.
 func (f *Function) emit(instr Instruction) Value {
 	return f.currentBlock.emit(instr)
-}
-
-// RelString returns the full name of this function, qualified by
-// package name, receiver type, etc.
-//
-// The specific formatting rules are not guaranteed and may change.
-//
-// Examples:
-//      "math.IsNaN"                  // a package-level function
-//      "(*bytes.Buffer).Bytes"       // a declared method or a wrapper
-//      "(*bytes.Buffer).Bytes$thunk" // thunk (func wrapping method; receiver is param 0)
-//      "(*bytes.Buffer).Bytes$bound" // bound (func wrapping method; receiver supplied by closure)
-//      "main.main$1"                 // an anonymous function in main
-//      "main.init#1"                 // a declared init function
-//      "main.init"                   // the synthesized package initializer
-//
-// When these functions are referred to from within the same package
-// (i.e. from == f.Pkg.Object), they are rendered without the package path.
-// For example: "IsNaN", "(*Buffer).Bytes", etc.
-//
-// All non-synthetic functions have distinct package-qualified names.
-// (But two methods may have the same name "(T).f" if one is a synthetic
-// wrapper promoting a non-exported method "f" from another package; in
-// that case, the strings are equal but the identifiers "f" are distinct.)
-//
-func (f *Function) RelString(from *types.Package) string {
-	// Anonymous?
-	if f.parent != nil {
-		// An anonymous function's Name() looks like "parentName$1",
-		// but its String() should include the type/package/etc.
-		parent := f.parent.RelString(from)
-		for i, anon := range f.parent.AnonFuncs {
-			if anon == f {
-				return fmt.Sprintf("%s$%d", parent, 1+i)
-			}
-		}
-
-		return f.name // should never happen
-	}
-
-	// Method (declared or wrapper)?
-	if recv := f.Signature.Recv(); recv != nil {
-		return f.relMethod(from, recv.Type())
-	}
-
-	// Thunk?
-	if f.method != nil {
-		return f.relMethod(from, f.method.Recv())
-	}
-
-	// Bound?
-	if len(f.FreeVars) == 1 && strings.HasSuffix(f.name, "$bound") {
-		return f.relMethod(from, f.FreeVars[0].Type())
-	}
-
-	// Package-level function?
-	// Prefix with package name for cross-package references only.
-	if p := f.pkg(); p != nil && p != from {
-		return fmt.Sprintf("%s.%s", p.Path(), f.name)
-	}
-
-	// Unknown.
-	return f.name
-}
-
-func (f *Function) relMethod(from *types.Package, recv types.Type) string {
-	return fmt.Sprintf("(%s).%s", relType(recv, from), f.name)
 }
 
 // writeSignature writes to buf the signature sig in declaration syntax.
@@ -451,12 +321,7 @@ func writeSignature(buf *bytes.Buffer, from *types.Package, name string, sig *ty
 	types.WriteSignature(buf, sig, types.RelativeTo(from))
 }
 
-func (f *Function) pkg() *types.Package {
-	if f.Pkg != nil {
-		return f.Pkg.Pkg
-	}
-	return nil
-}
+
 
 var _ io.WriterTo = (*Function)(nil) // *Function implements io.Writer
 
@@ -576,37 +441,4 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 	return b
 }
 
-// NewFunction returns a new synthetic Function instance belonging to
-// prog, with its name and signature fields set as specified.
-//
-// The caller is responsible for initializing the remaining fields of
-// the function object, e.g. Pkg, Params, Blocks.
-//
-// It is practically impossible for clients to construct well-formed
-// SSA functions/packages/programs directly, so we assume this is the
-// job of the Builder alone.  NewFunction exists to provide clients a
-// little flexibility.  For example, analysis tools may wish to
-// construct fake Functions for the root of the callgraph, a fake
-// "reflect" package, etc.
-//
-// TODO(adonovan): think harder about the API here.
-//
-func (prog *Program) NewFunction(name string, sig *types.Signature, provenance string) *Function {
-	return &Function{Prog: prog, name: name, Signature: sig, Synthetic: provenance}
-}
-
-type extentNode [2]token.Pos
-
-func (n extentNode) Pos() token.Pos { return n[0] }
-func (n extentNode) End() token.Pos { return n[1] }
-
-// Syntax returns an ast.Node whose Pos/End methods provide the
-// lexical extent of the function if it was defined by Go source code
-// (f.Synthetic==""), or nil otherwise.
-//
-// If f was built with debug information (see Package.SetDebugRef),
-// the result is the *ast.FuncDecl or *ast.FuncLit that declared the
-// function.  Otherwise, it is an opaque Node providing only position
-// information; this avoids pinning the AST in memory.
-//
-func (f *Function) Syntax() ast.Node { return f.syntax }
+func (f *Function) Syntax() *ast.FunctionExpr { return f.syntax }

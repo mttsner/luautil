@@ -15,3 +15,5 @@ type FuncName struct {
 	Receiver Expr
 	Method   string
 }
+
+type Chunk []Stmt

@@ -126,5 +126,5 @@ type FunctionExpr struct {
 	ExprBase
 
 	ParList *ParList
-	Stmts   []Stmt
+	Chunk   Chunk
 }

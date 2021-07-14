@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/notnoobmaster/luautil/parse"
-	"github.com/notnoobmaster/luautil/ast"
 )
 
 var optimizeTest = `
@@ -41,7 +40,7 @@ func TestOptimize(t *testing.T) {
 
 	Optimize(chunk)
 
-	if ast.Beautify(chunk) != optimizeTarget {
+	if chunk.String() != optimizeTarget {
 		t.Error("Test failed")
 	}
 }

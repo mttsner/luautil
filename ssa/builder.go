@@ -77,11 +77,74 @@ func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 		}
 		return call
 	case *ast.FunctionExpr:
-		fn := &Function{syntax: ex}
-		b.buildFunction(fn)
+		f := &Function{syntax: ex}
+		b.buildFunction(f)
 		return fn.emit(fn)
 	}
 	panic("unimplemented expression")
+}
+
+// buildFunction builds SSA code for the body of function fn.  Idempotent.
+func (b *builder) buildFunction(fn *Function) {
+	if fn.Blocks != nil {
+		return // building already started
+	}
+
+	var recvField *ast.FieldList
+	var body *ast.BlockStmt
+	var functype *ast.FuncType
+	switch n := fn.syntax.(type) {
+	case nil:
+		return // not a Go source function.  (Synthetic, or from object file.)
+	case *ast.FuncDecl:
+		functype = n.Type
+		recvField = n.Recv
+		body = n.Body
+	case *ast.FuncLit:
+		functype = n.Type
+		body = n.Body
+	default:
+		panic(n)
+	}
+
+	if body == nil {
+		// External function.
+		if fn.Params == nil {
+			// This condition ensures we add a non-empty
+			// params list once only, but we may attempt
+			// the degenerate empty case repeatedly.
+			// TODO(adonovan): opt: don't do that.
+
+			// We set Function.Params even though there is no body
+			// code to reference them.  This simplifies clients.
+			if recv := fn.Signature.Recv(); recv != nil {
+				fn.addParamObj(recv)
+			}
+			params := fn.Signature.Params()
+			for i, n := 0, params.Len(); i < n; i++ {
+				fn.addParamObj(params.At(i))
+			}
+		}
+		return
+	}
+	if fn.Prog.mode&LogSource != 0 {
+		defer logStack("build function %s @ %s", fn, fn.Prog.Fset.Position(fn.pos))()
+	}
+	fn.startBody()
+	fn.createSyntacticParams(recvField, functype)
+	b.stmt(fn, body)
+	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
+		// Control fell off the end of the function's body block.
+		//
+		// Block optimizations eliminate the current block, if
+		// unreachable.  It is a builder invariant that
+		// if this no-arg return is ill-typed for
+		// fn.Signature.Results, this block must be
+		// unreachable.  The sanity checker checks this.
+		fn.emit(new(RunDefers))
+		fn.emit(new(Return))
+	}
+	fn.finishBody()
 }
 
 // repeat stmtemits to fn code for the repeat statement s
@@ -159,15 +222,15 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	case *ast.AssignStmt:
 		if len(s.Lhs) <= len(s.Rhs) { // a, b = 1, 2 or a, b = 1, 2, 3
 			for i, ex := range s.Lhs {
-				fn.addAssign(ex, b.expr(fn, s.Rhs[i]))
+				fn.addAssign(b.expr(fn, ex), b.expr(fn, s.Rhs[i]))
 			}
 		} else { // a, b = 1
 			i, l, r := 0, len(s.Lhs), len(s.Rhs)
 			for ; i < l; i++ {
-				fn.addAssign(s.Lhs[i], b.expr(fn, s.Rhs[i]))
+				fn.addAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, s.Rhs[i]))
 			}
 			for ; i < r; i++ {
-				fn.addAssign(s.Lhs[i], b.expr(fn, &ast.NilExpr{}))
+				fn.addAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, &ast.NilExpr{}))
 			}
 		}
 

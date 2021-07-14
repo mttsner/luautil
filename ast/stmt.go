@@ -43,29 +43,29 @@ type FuncCallStmt struct {
 type DoBlockStmt struct {
 	StmtBase
 
-	Stmts []Stmt
+	Chunk Chunk
 }
 
 type WhileStmt struct {
 	StmtBase
 
 	Condition Expr
-	Stmts     []Stmt
+	Chunk     Chunk
 }
 
 type RepeatStmt struct {
 	StmtBase
 
 	Condition Expr
-	Stmts     []Stmt
+	Chunk     Chunk
 }
 
 type IfStmt struct {
 	StmtBase
 
 	Condition Expr
-	Then      []Stmt
-	Else      []Stmt
+	Then      Chunk
+	Else      Chunk
 }
 
 type NumberForStmt struct {
@@ -75,7 +75,7 @@ type NumberForStmt struct {
 	Init  Expr
 	Limit Expr
 	Step  Expr
-	Stmts []Stmt
+	Chunk Chunk
 }
 
 type GenericForStmt struct {
@@ -83,7 +83,7 @@ type GenericForStmt struct {
 
 	Names []string
 	Exprs []Expr
-	Stmts []Stmt
+	Chunk Chunk
 }
 
 type FuncDefStmt struct {

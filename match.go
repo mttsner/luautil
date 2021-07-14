@@ -8,7 +8,7 @@ import (
 type state struct {
 	Pattern []ast.Stmt
 	Exprs []ast.Expr
-	Stmts []ast.Stmt
+	Chunk []ast.Stmt
 	Exit bool
 }
 
@@ -32,7 +32,7 @@ func (s *state) quickTraverseExpr(expr ast.Expr) {
 	case *ast.UnaryOpExpr:
 		s.quickTraverseExpr(ex.Expr)
 	case *ast.FunctionExpr:
-		if s.match(ex.Stmts) {
+		if s.match(ex.Chunk) {
 			s.Exit = true // KINDA FUCKING HACKY
 		}
 	case *ast.TableExpr:
@@ -132,7 +132,7 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 		if f, ok := selector.(*ast.FunctionExpr); ok {
 			if ex.ParList.HasVargs == f.ParList.HasVargs && 
 			len(ex.ParList.Names) == len(f.ParList.Names) && 
-			s.stmtsEqual(ex.Stmts, f.Stmts) {
+			s.stmtsEqual(ex.Chunk, f.Chunk) {
 				for i, name := range f.ParList.Names {
 					if name == "_IdentExpr_" {
 						s.Exprs = append(s.Exprs, &ast.IdentExpr{Value: ex.ParList.Names[i]})
@@ -183,17 +183,17 @@ func (s *state) funcCallEqual(first *ast.FuncCallStmt, second *ast.FuncCallStmt)
 }
 
 func (s *state) doBlockEqual(first *ast.DoBlockStmt, second *ast.DoBlockStmt) bool {
-	return s.stmtsEqual(first.Stmts, second.Stmts)
+	return s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
 func (s *state) whileEqual(first *ast.WhileStmt, second *ast.WhileStmt) bool {
 	return s.exprEqual(first.Condition, second.Condition) &&
-		s.stmtsEqual(first.Stmts, second.Stmts)
+		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
 func (s *state) repeatEqual(first *ast.RepeatStmt, second *ast.RepeatStmt) bool {
 	return s.exprEqual(first.Condition, second.Condition) && 
-		s.stmtsEqual(first.Stmts, second.Stmts)
+		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
 func (s *state) funcDefEqual(first *ast.FuncDefStmt, second *ast.FuncDefStmt) bool {
@@ -214,14 +214,14 @@ func (s *state) ifEqual(first *ast.IfStmt, second *ast.IfStmt) bool {
 
 func (s *state) numberForEqual(first *ast.NumberForStmt, second *ast.NumberForStmt) bool {
 	return first.Step == second.Step &&
-		s.stmtsEqual(first.Stmts, second.Stmts)
+		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
 func (s *state) genericForEqual(first *ast.GenericForStmt, second *ast.GenericForStmt) bool {
 	return len(first.Names) == len(second.Names) &&
 		len(first.Exprs) == len(second.Exprs) &&
 		s.exprsEqual(first.Exprs, second.Exprs) &&
-		s.stmtsEqual(first.Stmts, second.Stmts)
+		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
 func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
@@ -288,7 +288,7 @@ func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
 			} else if custom, ok := cStmt.(*ast.FuncCallStmt); ok {
 				if expr, ok := custom.Expr.(*ast.FuncCallExpr); ok {
 					if ident, ok := expr.Func.(*ast.IdentExpr); ok && ident.Value == "_IfStmt_" {
-						s.Stmts = append(s.Stmts, stmt)
+						s.Chunk = append(s.Chunk, stmt)
 						break
 					}
 				}
@@ -357,7 +357,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				pos = 0
 				success = true
 			} else {
-				if s.match(stmt.Stmts){
+				if s.match(stmt.Chunk){
 					return true
 				}
 			}
@@ -369,7 +369,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				success = true
 			} else {
 				s.quickTraverseExpr(stmt.Condition)
-				if s.match(stmt.Stmts){
+				if s.match(stmt.Chunk){
 					return true
 				}
 			}
@@ -381,7 +381,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				success = true
 			} else {
 				s.quickTraverseExpr(stmt.Condition)
-				if s.match(stmt.Stmts){
+				if s.match(stmt.Chunk){
 					return true
 				}	
 			}
@@ -428,7 +428,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				pos = 0
 				success = true
 			} else {
-				s.match(stmt.Stmts)
+				s.match(stmt.Chunk)
 			}
 		case *ast.GenericForStmt:
 			if result, ok := cStmt.(*ast.GenericForStmt); ok && s.genericForEqual(stmt, result) {
@@ -438,7 +438,7 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				success = true
 			} else {
 				s.quickTraverseExprs(stmt.Exprs)
-				s.match(stmt.Stmts)
+				s.match(stmt.Chunk)
 			}
 		}
 
@@ -463,5 +463,5 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 // Match pattern in ast.
 func Match(chunk []ast.Stmt, pattern []ast.Stmt) (bool, []ast.Expr, []ast.Stmt) {
 	st := state{Pattern: pattern}
-	return st.match(chunk), st.Exprs, st.Stmts
+	return st.match(chunk), st.Exprs, st.Chunk
 }
