@@ -12,7 +12,7 @@ type yySymType struct {
 	yys   int
 	token ast.Token
 
-	stmts []ast.Stmt
+	stmts ast.Chunk
 	stmt  ast.Stmt
 
 	funcname *ast.FuncName
@@ -888,26 +888,26 @@ yynewstate:
 		{
 			yyVAL.stmts = yyS[yypt-0].stmts
 			if l, ok := yylex.(*Lexer); ok {
-				l.Stmts = yyVAL.stmts
+				l.Chunk = yyVAL.stmts
 			}
 		}
 	case 2:
 		{
 			yyVAL.stmts = append(yyS[yypt-1].stmts, yyS[yypt-0].stmt)
 			if l, ok := yylex.(*Lexer); ok {
-				l.Stmts = yyVAL.stmts
+				l.Chunk = yyVAL.stmts
 			}
 		}
 	case 3:
 		{
 			yyVAL.stmts = append(yyS[yypt-2].stmts, yyS[yypt-1].stmt)
 			if l, ok := yylex.(*Lexer); ok {
-				l.Stmts = yyVAL.stmts
+				l.Chunk = yyVAL.stmts
 			}
 		}
 	case 4:
 		{
-			yyVAL.stmts = []ast.Stmt{}
+			yyVAL.stmts = ast.Chunk{}
 		}
 	case 5:
 		{
@@ -942,19 +942,19 @@ yynewstate:
 		}
 	case 11:
 		{
-			yyVAL.stmt = &ast.DoBlockStmt{Stmts: yyS[yypt-1].stmts}
+			yyVAL.stmt = &ast.DoBlockStmt{Chunk: yyS[yypt-1].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-2].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 12:
 		{
-			yyVAL.stmt = &ast.WhileStmt{Condition: yyS[yypt-3].expr, Stmts: yyS[yypt-1].stmts}
+			yyVAL.stmt = &ast.WhileStmt{Condition: yyS[yypt-3].expr, Chunk: yyS[yypt-1].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-4].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 13:
 		{
-			yyVAL.stmt = &ast.RepeatStmt{Condition: yyS[yypt-0].expr, Stmts: yyS[yypt-2].stmts}
+			yyVAL.stmt = &ast.RepeatStmt{Condition: yyS[yypt-0].expr, Chunk: yyS[yypt-2].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-3].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].expr.Line())
 		}
@@ -963,7 +963,7 @@ yynewstate:
 			yyVAL.stmt = &ast.IfStmt{Condition: yyS[yypt-4].expr, Then: yyS[yypt-2].stmts}
 			cur := yyVAL.stmt
 			for _, elseif := range yyS[yypt-1].stmts {
-				cur.(*ast.IfStmt).Else = []ast.Stmt{elseif}
+				cur.(*ast.IfStmt).Else = ast.Chunk{elseif}
 				cur = elseif
 			}
 			yyVAL.stmt.SetLine(yyS[yypt-5].token.Pos.Line)
@@ -974,7 +974,7 @@ yynewstate:
 			yyVAL.stmt = &ast.IfStmt{Condition: yyS[yypt-6].expr, Then: yyS[yypt-4].stmts}
 			cur := yyVAL.stmt
 			for _, elseif := range yyS[yypt-3].stmts {
-				cur.(*ast.IfStmt).Else = []ast.Stmt{elseif}
+				cur.(*ast.IfStmt).Else = ast.Chunk{elseif}
 				cur = elseif
 			}
 			cur.(*ast.IfStmt).Else = yyS[yypt-1].stmts
@@ -983,19 +983,19 @@ yynewstate:
 		}
 	case 16:
 		{
-			yyVAL.stmt = &ast.NumberForStmt{Name: yyS[yypt-7].token.Str, Init: yyS[yypt-5].expr, Limit: yyS[yypt-3].expr, Stmts: yyS[yypt-1].stmts}
+			yyVAL.stmt = &ast.NumberForStmt{Name: yyS[yypt-7].token.Str, Init: yyS[yypt-5].expr, Limit: yyS[yypt-3].expr, Chunk: yyS[yypt-1].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-8].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 17:
 		{
-			yyVAL.stmt = &ast.NumberForStmt{Name: yyS[yypt-9].token.Str, Init: yyS[yypt-7].expr, Limit: yyS[yypt-5].expr, Step: yyS[yypt-3].expr, Stmts: yyS[yypt-1].stmts}
+			yyVAL.stmt = &ast.NumberForStmt{Name: yyS[yypt-9].token.Str, Init: yyS[yypt-7].expr, Limit: yyS[yypt-5].expr, Step: yyS[yypt-3].expr, Chunk: yyS[yypt-1].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-10].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 18:
 		{
-			yyVAL.stmt = &ast.GenericForStmt{Names: yyS[yypt-5].namelist, Exprs: yyS[yypt-3].exprlist, Stmts: yyS[yypt-1].stmts}
+			yyVAL.stmt = &ast.GenericForStmt{Names: yyS[yypt-5].namelist, Exprs: yyS[yypt-3].exprlist, Chunk: yyS[yypt-1].stmts}
 			yyVAL.stmt.SetLine(yyS[yypt-6].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
@@ -1038,7 +1038,7 @@ yynewstate:
 		}
 	case 26:
 		{
-			yyVAL.stmts = []ast.Stmt{}
+			yyVAL.stmts = ast.Chunk{}
 		}
 	case 27:
 		{
@@ -1349,19 +1349,19 @@ yynewstate:
 		}
 	case 90:
 		{
-			yyVAL.expr = &ast.FunctionExpr{ParList: yyS[yypt-0].funcexpr.ParList, Stmts: yyS[yypt-0].funcexpr.Stmts}
+			yyVAL.expr = &ast.FunctionExpr{ParList: yyS[yypt-0].funcexpr.ParList, Chunk: yyS[yypt-0].funcexpr.Chunk}
 			yyVAL.expr.SetLine(yyS[yypt-1].token.Pos.Line)
 			yyVAL.expr.SetLastLine(yyS[yypt-0].funcexpr.LastLine())
 		}
 	case 91:
 		{
-			yyVAL.funcexpr = &ast.FunctionExpr{ParList: yyS[yypt-3].parlist, Stmts: yyS[yypt-1].stmts}
+			yyVAL.funcexpr = &ast.FunctionExpr{ParList: yyS[yypt-3].parlist, Chunk: yyS[yypt-1].stmts}
 			yyVAL.funcexpr.SetLine(yyS[yypt-4].token.Pos.Line)
 			yyVAL.funcexpr.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}
 	case 92:
 		{
-			yyVAL.funcexpr = &ast.FunctionExpr{ParList: &ast.ParList{HasVargs: false, Names: []string{}}, Stmts: yyS[yypt-1].stmts}
+			yyVAL.funcexpr = &ast.FunctionExpr{ParList: &ast.ParList{HasVargs: false, Names: []string{}}, Chunk: yyS[yypt-1].stmts}
 			yyVAL.funcexpr.SetLine(yyS[yypt-3].token.Pos.Line)
 			yyVAL.funcexpr.SetLastLine(yyS[yypt-0].token.Pos.Line)
 		}

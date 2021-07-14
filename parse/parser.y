@@ -34,7 +34,7 @@ import (
 %union {
   token  ast.Token
 
-  stmts    []ast.Stmt
+  stmts    ast.Chunk
   stmt     ast.Stmt
 
   funcname *ast.FuncName
@@ -77,25 +77,25 @@ chunk:
         chunk1 {
             $$ = $1
             if l, ok := yylex.(*Lexer); ok {
-                l.Stmts = $$
+                l.Chunk = $$
             }
         } |
         chunk1 laststat {
             $$ = append($1, $2)
             if l, ok := yylex.(*Lexer); ok {
-                l.Stmts = $$
+                l.Chunk = $$
             }
         } | 
         chunk1 laststat ';' {
             $$ = append($1, $2)
             if l, ok := yylex.(*Lexer); ok {
-                l.Stmts = $$
+                l.Chunk = $$
             }
         }
 
 chunk1: 
         {
-            $$ = []ast.Stmt{}
+            $$ = ast.Chunk{}
         } |
         chunk1 stat {
             $$ = append($1, $2)
@@ -128,17 +128,17 @@ stat:
             }
         } |
         TDo block TEnd {
-            $$ = &ast.DoBlockStmt{Stmts: $2}
+            $$ = &ast.DoBlockStmt{Chunk: $2}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($3.Pos.Line)
         } |
         TWhile expr TDo block TEnd {
-            $$ = &ast.WhileStmt{Condition: $2, Stmts: $4}
+            $$ = &ast.WhileStmt{Condition: $2, Chunk: $4}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($5.Pos.Line)
         } |
         TRepeat block TUntil expr {
-            $$ = &ast.RepeatStmt{Condition: $4, Stmts: $2}
+            $$ = &ast.RepeatStmt{Condition: $4, Chunk: $2}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($4.Line())
         } |
@@ -146,7 +146,7 @@ stat:
             $$ = &ast.IfStmt{Condition: $2, Then: $4}
             cur := $$
             for _, elseif := range $5 {
-                cur.(*ast.IfStmt).Else = []ast.Stmt{elseif}
+                cur.(*ast.IfStmt).Else = ast.Chunk{elseif}
                 cur = elseif
             }
             $$.SetLine($1.Pos.Line)
@@ -156,7 +156,7 @@ stat:
             $$ = &ast.IfStmt{Condition: $2, Then: $4}
             cur := $$
             for _, elseif := range $5 {
-                cur.(*ast.IfStmt).Else = []ast.Stmt{elseif}
+                cur.(*ast.IfStmt).Else = ast.Chunk{elseif}
                 cur = elseif
             }
             cur.(*ast.IfStmt).Else = $7
@@ -164,17 +164,17 @@ stat:
             $$.SetLastLine($8.Pos.Line)
         } |
         TFor TIdent '=' expr ',' expr TDo block TEnd {
-            $$ = &ast.NumberForStmt{Name: $2.Str, Init: $4, Limit: $6, Stmts: $8}
+            $$ = &ast.NumberForStmt{Name: $2.Str, Init: $4, Limit: $6, Chunk: $8}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($9.Pos.Line)
         } |
         TFor TIdent '=' expr ',' expr ',' expr TDo block TEnd {
-            $$ = &ast.NumberForStmt{Name: $2.Str, Init: $4, Limit: $6, Step:$8, Stmts: $10}
+            $$ = &ast.NumberForStmt{Name: $2.Str, Init: $4, Limit: $6, Step:$8, Chunk: $10}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($11.Pos.Line)
         } |
         TFor namelist TIn exprlist TDo block TEnd {
-            $$ = &ast.GenericForStmt{Names:$2, Exprs:$4, Stmts: $6}
+            $$ = &ast.GenericForStmt{Names:$2, Exprs:$4, Chunk: $6}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($7.Pos.Line)
         } |
@@ -211,7 +211,7 @@ stat:
 
 elseifs: 
         {
-            $$ = []ast.Stmt{}
+            $$ = ast.Chunk{}
         } | 
         elseifs TElseIf expr TThen block {
             $$ = append($1, &ast.IfStmt{Condition: $3, Then: $5})
@@ -485,19 +485,19 @@ args:
 
 function:
         TFunction funcbody {
-            $$ = &ast.FunctionExpr{ParList:$2.ParList, Stmts: $2.Stmts}
+            $$ = &ast.FunctionExpr{ParList:$2.ParList, Chunk: $2.Chunk}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($2.LastLine())
         }
 
 funcbody:
         '(' parlist ')' block TEnd {
-            $$ = &ast.FunctionExpr{ParList: $2, Stmts: $4}
+            $$ = &ast.FunctionExpr{ParList: $2, Chunk: $4}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($5.Pos.Line)
         } | 
         '(' ')' block TEnd {
-            $$ = &ast.FunctionExpr{ParList: &ast.ParList{HasVargs: false, Names: []string{}}, Stmts: $3}
+            $$ = &ast.FunctionExpr{ParList: &ast.ParList{HasVargs: false, Names: []string{}}, Chunk: $3}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($4.Pos.Line)
         }

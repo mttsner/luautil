@@ -125,7 +125,7 @@ func (h *Handlers) expr(ex *ast.Expr) *ast.Expr {
 		if h.FunctionExpr != nil {
 			h.FunctionExpr(e)
 		} else {
-			h.Traverse(e.Stmts)
+			h.Traverse(e.Chunk)
 		}
 	}
 	return ex
@@ -177,7 +177,7 @@ func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 			if h.DoBlockStmt != nil {
 				h.DoBlockStmt(s)
 			} else {
-				h.Traverse(s.Stmts)
+				h.Traverse(s.Chunk)
 			}
 		case *ast.WhileStmt:
 			if ex := h.expr(&s.Condition); ex != nil {
@@ -186,7 +186,7 @@ func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 			if h.WhileStmt != nil {
 				h.WhileStmt(s)
 			} else {
-				h.Traverse(s.Stmts)
+				h.Traverse(s.Chunk)
 			}
 		case *ast.RepeatStmt:
 			if ex := h.expr(&s.Condition); ex != nil {
@@ -195,7 +195,7 @@ func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 			if h.RepeatStmt != nil {
 				h.RepeatStmt(s)
 			} else {
-				h.Traverse(s.Stmts)
+				h.Traverse(s.Chunk)
 			}
 		case *ast.FuncDefStmt:
 			if s.Name.Func == nil {
@@ -253,7 +253,7 @@ func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 			if h.NumberForStmt != nil {
 				h.NumberForStmt(s)
 			} else {
-				h.Traverse(s.Stmts)
+				h.Traverse(s.Chunk)
 			}
 		case *ast.GenericForStmt:
 			for i := range s.Exprs {
@@ -264,7 +264,7 @@ func (h *Handlers) compileStmt(chunk []ast.Stmt) {
 			if h.GenericForStmt != nil {
 				h.GenericForStmt(s)
 			} else {
-				h.Traverse(s.Stmts)
+				h.Traverse(s.Chunk)
 			}
 		case *ast.ContinueStmt:
 			if h.ContinueStmt != nil {

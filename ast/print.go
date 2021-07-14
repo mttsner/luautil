@@ -5,6 +5,16 @@ import (
 	"strings"
 )
 
+func (c Chunk) String() string { 
+	s := &builder{
+		Str:    &strings.Builder{},
+		Data:   &data{},
+		Indent: -1, // Accounting for the fact that each chunk call increments Indent by one
+	}
+	s.chunk(c)
+	return s.Str.String()
+}
+
 // Expressions
 
 func (v *NilExpr) String() string { return "nil" }

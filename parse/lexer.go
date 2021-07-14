@@ -593,7 +593,7 @@ finally:
 
 type Lexer struct {
 	scanner       *Scanner
-	Stmts         []ast.Stmt
+	Chunk         ast.Chunk
 	PNewLine      bool
 	Token         ast.Token
 	PrevTokenType int
@@ -621,7 +621,7 @@ func (lx *Lexer) TokenError(tok ast.Token, message string) {
 	panic(lx.scanner.TokenError(tok, message))
 }
 
-func Parse(reader io.Reader, name string) (chunk []ast.Stmt, err error) {
+func Parse(reader io.Reader, name string) (chunk ast.Chunk, err error) {
 	lexer := &Lexer{NewScanner(reader, name), nil, false, ast.Token{Str: ""}, TNil}
 	chunk = nil
 	defer func() {
@@ -630,7 +630,7 @@ func Parse(reader io.Reader, name string) (chunk []ast.Stmt, err error) {
 		}
 	}()
 	yyParse(lexer)
-	chunk = lexer.Stmts
+	chunk = lexer.Chunk
 	return
 }
 
