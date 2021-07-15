@@ -22,7 +22,7 @@ func TestBuilder(t *testing.T) {
 
 	fn := &Function{
 		name: "main",
-		syntax: &ast.FunctionExpr{Stmts: chunk},
+		syntax: &ast.FunctionExpr{Chunk: chunk},
 	}
 	b.buildFunction(fn)
 
