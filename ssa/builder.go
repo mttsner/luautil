@@ -12,19 +12,19 @@ type builder struct{}
 func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 	switch ex := expr.(type) {
 	case *ast.NumberExpr:
-		return Number{Value: ex.Value}
+		return Const{Value: ex.Value}
 	case *ast.NilExpr:
-		return Nil{}
+		return Const{Value: nil}
 	case *ast.FalseExpr:
-		return False{}
+		return Const{Value: false}
 	case *ast.TrueExpr:
-		return True{}
+		return Const{Value: true}
 	case *ast.IdentExpr:
 		return fn.lookup(ex.Value)
 	case *ast.Comma3Expr:
 		return VarArg{}
 	case *ast.StringExpr:
-		return String{Value: ex.Value}
+		return Const{Value: ex.Value}
 	case *ast.AttrGetExpr:
 		return AttrGet{
 			Object: b.expr(fn, ex.Object),
@@ -79,72 +79,14 @@ func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 	case *ast.FunctionExpr:
 		f := &Function{syntax: ex}
 		b.buildFunction(f)
-		return fn.emit(fn)
+		//return fn.emit(fn)
 	}
 	panic("unimplemented expression")
 }
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
 func (b *builder) buildFunction(fn *Function) {
-	if fn.Blocks != nil {
-		return // building already started
-	}
-
-	var recvField *ast.FieldList
-	var body *ast.BlockStmt
-	var functype *ast.FuncType
-	switch n := fn.syntax.(type) {
-	case nil:
-		return // not a Go source function.  (Synthetic, or from object file.)
-	case *ast.FuncDecl:
-		functype = n.Type
-		recvField = n.Recv
-		body = n.Body
-	case *ast.FuncLit:
-		functype = n.Type
-		body = n.Body
-	default:
-		panic(n)
-	}
-
-	if body == nil {
-		// External function.
-		if fn.Params == nil {
-			// This condition ensures we add a non-empty
-			// params list once only, but we may attempt
-			// the degenerate empty case repeatedly.
-			// TODO(adonovan): opt: don't do that.
-
-			// We set Function.Params even though there is no body
-			// code to reference them.  This simplifies clients.
-			if recv := fn.Signature.Recv(); recv != nil {
-				fn.addParamObj(recv)
-			}
-			params := fn.Signature.Params()
-			for i, n := 0, params.Len(); i < n; i++ {
-				fn.addParamObj(params.At(i))
-			}
-		}
-		return
-	}
-	if fn.Prog.mode&LogSource != 0 {
-		defer logStack("build function %s @ %s", fn, fn.Prog.Fset.Position(fn.pos))()
-	}
-	fn.startBody()
-	fn.createSyntacticParams(recvField, functype)
-	b.stmt(fn, body)
-	if cb := fn.currentBlock; cb != nil && (cb == fn.Blocks[0] || cb == fn.Recover || cb.Preds != nil) {
-		// Control fell off the end of the function's body block.
-		//
-		// Block optimizations eliminate the current block, if
-		// unreachable.  It is a builder invariant that
-		// if this no-arg return is ill-typed for
-		// fn.Signature.Results, this block must be
-		// unreachable.  The sanity checker checks this.
-		fn.emit(new(RunDefers))
-		fn.emit(new(Return))
-	}
-	fn.finishBody()
+	
 }
 
 // repeat stmtemits to fn code for the repeat statement s
@@ -158,7 +100,7 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 	fn.addReturn(b.expr(fn, s.Condition), body, done)
 
 	fn.currentBlock = body
-	b.stmtList(fn, s.Stmts)
+	b.stmtList(fn, s.Chunk)
 	emitJump(fn, loop)
 	fn.currentBlock = done
 }
@@ -173,7 +115,7 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	fn.addWhile(b.expr(fn, s.Condition), body, done)
 
 	fn.currentBlock = body
-	b.stmtList(fn, s.Stmts)
+	b.stmtList(fn, s.Chunk)
 	emitJump(fn, loop)
 	fn.currentBlock = done
 }
@@ -188,7 +130,7 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	fn.addNumberFor(b, s, body, done)
 
 	fn.currentBlock = body
-	b.stmtList(fn, s.Stmts)
+	b.stmtList(fn, s.Chunk)
 	emitJump(fn, loop)
 	fn.currentBlock = done
 }
@@ -200,10 +142,23 @@ func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 
 	emitJump(fn, loop)
 
+	locals := make([]Local, len(s.Names))
+	values := make([]Value, len(s.Exprs))
+
+	for i, name:= range s.Names {
+		locals[i] = f.lookup(name)
+	}
+
+	for i, expr := range s.Exprs {
+		values[i] = b.expr(f, expr)
+	}
+
+
+
 	fn.addGenericFor(b, s, body, done)
 
 	fn.currentBlock = body
-	b.stmtList(fn, s.Stmts)
+	b.stmtList(fn, s.Chunk)
 	emitJump(fn, loop)
 	fn.currentBlock = done
 }
@@ -283,7 +238,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		// some some trickery to convert the exprs into useable values
 		// something like
 		// exprs(s.Exprs)
-		fn.emit(&Return{Results: s.Exprs, pos: s.Return})
+		//fn.emit(&Return{Results: s.Exprs, pos: s.Return})
 		fn.currentBlock = fn.newBasicBlock("unreachable")
 	case *ast.IfStmt:
 		then := fn.newBasicBlock("if.then")

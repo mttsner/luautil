@@ -63,6 +63,10 @@ type anInstruction struct {
 	block *BasicBlock // the basic block of this instruction
 }
 
+type Jump struct {
+	anInstruction
+}
+
 type Phi struct {
 	Comment string  // a hint as to its purpose
 	Edges   []Value // Edges[i] is value for Block().Preds[i]
@@ -92,6 +96,7 @@ type CompoundAssign struct {
 }
 
 type Return struct {
+	anInstruction
 	//TODO
 }
 
@@ -104,30 +109,21 @@ type While struct {
 
 type NumberFor struct {
 	anInstruction
-	Local Local
-
+	Local Value
 	Init  Value
-	Limit Value
+	Limit Value	
 	Step  Value
-
-	Body *BasicBlock
-	Done *BasicBlock
 }
 
 type GenericFor struct {
 	anInstruction
-	Locals []Local
+	Locals []Value
 	Values []Value
-
-	Body *BasicBlock
-	Done *BasicBlock
 }
 
 type If struct {
 	anInstruction
 	Cond  Value
-	True  *BasicBlock
-	False *BasicBlock
 }
 
 type Call struct {
@@ -140,18 +136,12 @@ type Call struct {
 
 // Expressions
 
-type Nil struct{}
-type False struct{}
-type True struct{}
+
+type Const struct {
+	Value interface{}
+}
+
 type VarArg struct{}
-
-type Number struct {
-	Value float64
-}
-
-type String struct {
-	Value string
-}
 
 type Table struct {
 	array     []Value
@@ -211,30 +201,11 @@ func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
-func (v *BinOp) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X, &v.Y)
-}
-
-func (s *Call) Operands(rands []*Value) []*Value {
-	return s.Call.Operands(rands)
-}
-
 func (v *Phi) Operands(rands []*Value) []*Value {
 	for i := range v.Edges {
 		rands = append(rands, &v.Edges[i])
 	}
 	return rands
-}
-
-func (s *Return) Operands(rands []*Value) []*Value {
-	for i := range s.Results {
-		rands = append(rands, &s.Results[i])
-	}
-	return rands
-}
-
-func (v *UnOp) Operands(rands []*Value) []*Value {
-	return append(rands, &v.X)
 }
 
 // Non-Instruction Values:
