@@ -179,12 +179,12 @@ stat:
             $$.SetLastLine($7.Pos.Line)
         } |
         TFunction funcname funcbody {
-            $$ = &ast.FuncDefStmt{Name: $2, Func: $3}
+            $$ = &ast.FunctionStmt{Name: $2, Func: $3}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($3.LastLine())
         } |
         TLocal TFunction TIdent funcbody {
-            $$ = &ast.LocalAssignStmt{Names:[]string{$3.Str}, Exprs: []ast.Expr{$4}}
+            $$ = &ast.LocalFunctionStmt{Name: $3.Str, Func: $4}
             $$.SetLine($1.Pos.Line)
             $$.SetLastLine($4.LastLine())
         } | 

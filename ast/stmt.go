@@ -86,7 +86,14 @@ type GenericForStmt struct {
 	Chunk Chunk
 }
 
-type FuncDefStmt struct {
+type LocalFunctionStmt struct {
+	StmtBase
+
+	Name string
+	Func *FunctionExpr
+}
+
+type FunctionStmt struct {
 	StmtBase
 
 	Name *FuncName

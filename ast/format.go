@@ -310,7 +310,7 @@ func (s *builder) stmt(st Stmt) {
 		s.chunk(stmt.Chunk)
 		s.tab().add("until ")
 		s.expr(stmt.Condition)
-	case *FuncDefStmt:
+	case *FunctionStmt:
 		s.add("function ")
 		if stmt.Name.Func == nil {
 			s.expr(stmt.Name.Receiver)

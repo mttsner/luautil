@@ -1,8 +1,13 @@
 package ssa
 
-import "github.com/notnoobmaster/luautil/ast"
+import (
+	"fmt"
+
+	"github.com/notnoobmaster/luautil/ast"
+)
 
 type Value interface {
+	String() string
 }
 
 type Instruction interface {
@@ -22,24 +27,42 @@ type Node interface {
 	Referrers() *[]Instruction        // nil for non-Values
 }
 
+type Variable interface {
+	String() string
+}
+
+type Program struct {
+	Globals *Table
+	Main    *Function
+}
+
 type Function struct {
+	anInstruction
 	name string
+	num  int
 
 	syntax        *ast.FunctionExpr
-	parent        *Function          // enclosing function if anon; nil if global
-	Params        []*Parameter       // function parameters; for methods, includes receiver
-	Locals        []*Local           // local variables of this function
-	Blocks        []*BasicBlock      // basic blocks of the function; nil => external
-	Globals       map[string]*Global // global variables of this function
-	Names         map[string]*Local
+	parent        *Function // enclosing function if anon; nil if global
+	Params        []*Local  // function parameters; for methods, includes receiver
+	Locals        []*Local  // local variables of this function
+	Upvals        []*Local
+	Functions     []*Function   // nested functions defined inside this one
+	Blocks        []*BasicBlock // basic blocks of the function; nil => external
 	referrers     []Instruction // referring instructions (iff Parent() != nil)
 	continueBlock *BasicBlock
 	breakBlock    *BasicBlock
+	VarArg        bool
 
 	// The following fields are set transiently during building,
 	// then cleared.
-
+	currentScope *Scope      // lexical scope of this function
 	currentBlock *BasicBlock // where to emit code
+}
+
+type Scope struct {
+	function *Function
+	parent   *Scope
+	names    map[string]Variable
 }
 
 type BasicBlock struct {
@@ -50,13 +73,6 @@ type BasicBlock struct {
 	Preds, Succs []*BasicBlock  // predecessors and successors
 	succs2       [2]*BasicBlock // initial space for Succs
 	gaps         int            // number of nil Instrs (transient)
-	rundefers    int            // number of rundefers (transient)
-}
-
-type Parameter struct {
-	name      string
-	parent    *Function
-	referrers []Instruction
 }
 
 type anInstruction struct {
@@ -68,6 +84,7 @@ type Jump struct {
 }
 
 type Phi struct {
+	anInstruction
 	Comment string  // a hint as to its purpose
 	Edges   []Value // Edges[i] is value for Block().Preds[i]
 }
@@ -75,11 +92,16 @@ type Phi struct {
 type Local struct {
 	Comment string
 	Value   Value
+	num     int
 }
 
 type Global struct {
 	Comment string
-	Value   string
+	Value   Value
+}
+
+type Unknown struct {
+	Comment string
 }
 
 type Assign struct {
@@ -111,7 +133,7 @@ type NumberFor struct {
 	anInstruction
 	Local Value
 	Init  Value
-	Limit Value	
+	Limit Value
 	Step  Value
 }
 
@@ -123,7 +145,7 @@ type GenericFor struct {
 
 type If struct {
 	anInstruction
-	Cond  Value
+	Cond Value
 }
 
 type Call struct {
@@ -136,17 +158,19 @@ type Call struct {
 
 // Expressions
 
-
 type Const struct {
 	Value interface{}
 }
 
 type VarArg struct{}
 
+type Field struct {
+	Key   Value
+	Value Value
+}
+
 type Table struct {
-	array     []Value
-	hash      map[Value]Value
-	metaTable *Table
+	Fields []*Field
 }
 
 type AttrGet struct {
@@ -192,10 +216,6 @@ func (v *Function) Referrers() *[]Instruction {
 	return nil
 }
 
-func (v *Parameter) Name() string              { return v.name }
-func (v *Parameter) Referrers() *[]Instruction { return &v.referrers }
-func (v *Parameter) Parent() *Function         { return v.parent }
-
 func (v *anInstruction) Parent() *Function          { return v.block.parent }
 func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
@@ -209,6 +229,7 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 }
 
 // Non-Instruction Values:
-func (v *Const) Operands(rands []*Value) []*Value     { return rands }
-func (v *Function) Operands(rands []*Value) []*Value  { return rands }
-func (v *Parameter) Operands(rands []*Value) []*Value { return rands }
+func (v *Const) Operands(rands []*Value) []*Value    { return rands }
+func (v *Function) Operands(rands []*Value) []*Value { return rands }
+func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
+func (v *Local) Name() string                        { return fmt.Sprintf("t%d", v.num) }

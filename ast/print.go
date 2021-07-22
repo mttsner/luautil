@@ -149,7 +149,13 @@ func (s *GenericForStmt) String() string {
 	return b.Str.String()
 }
 
-func (s *FuncDefStmt) String() string {
+func (s *LocalFunctionStmt) String() string {
+	b := &builder{&strings.Builder{}, 0, &data{}}
+	b.stmt(s)
+	return b.Str.String()
+}
+
+func (s *FunctionStmt) String() string {
 	b := &builder{&strings.Builder{}, 0, &data{}}
 	b.stmt(s)
 	return b.Str.String()
