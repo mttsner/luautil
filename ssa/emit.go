@@ -48,7 +48,7 @@ func (f *Function) emitCompoundAssign(op string, lhs Value, rhs Value) {
 	})
 }
 
-func (f *Function) addAssign(lhs Value, rhs Value) {
+func (f *Function) emitAssign(lhs Value, rhs Value) {
 	f.emit(&Assign{
 		Lhs: lhs,
 		Rhs: rhs,
@@ -59,24 +59,12 @@ func (f *Function) emitReturn(cond Value, body *BasicBlock, done *BasicBlock) {
 	f.emit(&Return{})
 }
 
-func (f *Function) addLocalAssign(name string, value Value) {
-	local := &Local{Comment: name}
-
-	switch value.(type) {
-	case Const:
-		local.Value = value
-	default:
-		local.Value = Const{Value: nil}
-		f.emit(&Assign{
-			Lhs: local,
-			Rhs: value,
-		})
-	}
-	f.Locals = append(f.Locals, local)
-	f.Names[name] = local
+func (f *Function) emitLocalAssign(name string, value Value) {
+	local := f.addLocal(name)
+	f.emitAssign(local, value)
 }
 
-func emitJump(f *Function, target *BasicBlock) {
+func (f *Function) emitJump(target *BasicBlock) {
 	b := f.currentBlock
 	b.emit(new(Jump))
 	addEdge(b, target)

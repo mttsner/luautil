@@ -1001,13 +1001,13 @@ yynewstate:
 		}
 	case 19:
 		{
-			yyVAL.stmt = &ast.FuncDefStmt{Name: yyS[yypt-1].funcname, Func: yyS[yypt-0].funcexpr}
+			yyVAL.stmt = &ast.FunctionStmt{Name: yyS[yypt-1].funcname, Func: yyS[yypt-0].funcexpr}
 			yyVAL.stmt.SetLine(yyS[yypt-2].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].funcexpr.LastLine())
 		}
 	case 20:
 		{
-			yyVAL.stmt = &ast.LocalAssignStmt{Names: []string{yyS[yypt-1].token.Str}, Exprs: []ast.Expr{yyS[yypt-0].funcexpr}}
+			yyVAL.stmt = &ast.LocalFunctionStmt{Name: yyS[yypt-1].token.Str, Func: yyS[yypt-0].funcexpr}
 			yyVAL.stmt.SetLine(yyS[yypt-3].token.Pos.Line)
 			yyVAL.stmt.SetLastLine(yyS[yypt-0].funcexpr.LastLine())
 		}

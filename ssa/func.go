@@ -3,10 +3,8 @@ package ssa
 // This file implements the Function and BasicBlock types.
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
+	"strings"
 
 	"github.com/notnoobmaster/luautil/ast"
 )
@@ -19,13 +17,6 @@ func addEdge(from, to *BasicBlock) {
 
 // Parent returns the function that contains block b.
 func (b *BasicBlock) Parent() *Function { return b.parent }
-
-// String returns a human-readable label of this block.
-// It is not guaranteed unique within the function.
-//
-func (b *BasicBlock) String() string {
-	return fmt.Sprintf("%d", b.Index)
-}
 
 // emit appends an instruction to the current basic block.
 // If the instruction defines a Value, it is returned.
@@ -133,15 +124,39 @@ type lblock struct {
 // addParam adds a (non-escaping) parameter to f.Params of the
 // specified name, type and source position.
 //
-func (f *Function) addParam(name string) *Parameter {
-	v := &Parameter{
-		name:   name,
-		parent: f,
-	}
-	f.Params = append(f.Params, v)
-	return v
+func (f *Function) addParam(name string) {
+	f.Params = append(f.Params, f.addLocal(name))
 }
 
+func (f *Function) addLocal(name string) *Local {
+	local := &Local{
+		Comment: name,
+		Value:   Const{nil},
+		num:     len(f.Locals) + 1,
+	}
+	f.Locals = append(f.Locals, local)
+	f.currentScope.names[name] = local
+	return local
+}
+
+func (f *Function) addGlobal(name string) *Global {
+	global := &Global{
+		Comment: name,
+		Value:   Unknown{},
+	}
+	//f.Globals = append(f.Globals, global)
+	return global
+}
+
+func (f *Function) addFunction( syntax *ast.FunctionExpr) *Function {
+	fn := &Function{
+		parent: f,
+		syntax: syntax,
+		num: len(f.Functions) + 1,
+	}
+	f.Functions = append(f.Functions, fn)
+	return fn
+}
 
 // startBody initializes the function prior to generating SSA code for its body.
 // Precondition: f.Type() already set.
@@ -150,9 +165,16 @@ func (f *Function) startBody() {
 	f.currentBlock = f.newBasicBlock("entry")
 }
 
+func (f *Function) newScope() *Scope {
+	old := f.currentScope
+	f.currentScope = &Scope{f, f.currentScope, make(map[string]Variable)}
+	return old
+}
+
 // buildReferrers populates the def/use information in all non-nil
 // Value.Referrers slice.
 // Precondition: all such slices are initially empty.
+/*
 func buildReferrers(f *Function) {
 	var rands []*Value
 	for _, b := range f.Blocks {
@@ -168,14 +190,14 @@ func buildReferrers(f *Function) {
 		}
 	}
 }
-
+*/
 // finishBody() finalizes the function after SSA code generation of its body.
 func (f *Function) finishBody() {
 	f.currentBlock = nil
 
-	buildReferrers(f)
+	//buildReferrers(f)
 
-	lift(f)
+	//lift(f)
 }
 
 // removeNilBlocks eliminates nils from f.Blocks and updates each
@@ -197,141 +219,23 @@ func (f *Function) removeNilBlocks() {
 	f.Blocks = f.Blocks[:j]
 }
 
-
-
-func (f *Function) lookup(name string) Value {
-	if v, ok := f.Names[name]; ok {
+func (s *Scope) lookup(name string) Value {
+	if v, ok := s.names[name]; ok {
 		return v
 	}
-	if f.parent == nil {
-		return f.Globals[name]
+	if s.parent == nil {
+		return s.function.addGlobal(name)
 	}
-	return f.parent.lookup(name)
+	return s.parent.lookup(name)
 }
+
+func (f *Function) lookup(name string) Value {
+	return f.currentScope.lookup(name)
+}
+
 // emit emits the specified instruction to function f.
 func (f *Function) emit(instr Instruction) Value {
 	return f.currentBlock.emit(instr)
-}
-
-// writeSignature writes to buf the signature sig in declaration syntax.
-func writeSignature(buf *bytes.Buffer, from *types.Package, name string, sig *types.Signature, params []*Parameter) {
-	buf.WriteString("func ")
-	if recv := sig.Recv(); recv != nil {
-		buf.WriteString("(")
-		if n := params[0].Name(); n != "" {
-			buf.WriteString(n)
-			buf.WriteString(" ")
-		}
-		types.WriteType(buf, params[0].Type(), types.RelativeTo(from))
-		buf.WriteString(") ")
-	}
-	buf.WriteString(name)
-	types.WriteSignature(buf, sig, types.RelativeTo(from))
-}
-
-
-
-var _ io.WriterTo = (*Function)(nil) // *Function implements io.Writer
-
-func (f *Function) WriteTo(w io.Writer) (int64, error) {
-	var buf bytes.Buffer
-	WriteFunction(&buf, f)
-	n, err := w.Write(buf.Bytes())
-	return int64(n), err
-}
-
-// WriteFunction writes to buf a human-readable "disassembly" of f.
-func WriteFunction(buf *bytes.Buffer, f *Function) {
-	fmt.Fprintf(buf, "# Name: %s\n", f.String())
-	if f.Pkg != nil {
-		fmt.Fprintf(buf, "# Package: %s\n", f.Pkg.Pkg.Path())
-	}
-	if syn := f.Synthetic; syn != "" {
-		fmt.Fprintln(buf, "# Synthetic:", syn)
-	}
-	if pos := f.Pos(); pos.IsValid() {
-		fmt.Fprintf(buf, "# Location: %s\n", f.Prog.Fset.Position(pos))
-	}
-
-	if f.parent != nil {
-		fmt.Fprintf(buf, "# Parent: %s\n", f.parent.Name())
-	}
-
-	if f.Recover != nil {
-		fmt.Fprintf(buf, "# Recover: %s\n", f.Recover)
-	}
-
-	from := f.pkg()
-
-	if f.FreeVars != nil {
-		buf.WriteString("# Free variables:\n")
-		for i, fv := range f.FreeVars {
-			fmt.Fprintf(buf, "# % 3d:\t%s %s\n", i, fv.Name(), relType(fv.Type(), from))
-		}
-	}
-
-	if len(f.Locals) > 0 {
-		buf.WriteString("# Locals:\n")
-		for i, l := range f.Locals {
-			fmt.Fprintf(buf, "# % 3d:\t%s %s\n", i, l.Name(), relType(deref(l.Type()), from))
-		}
-	}
-	writeSignature(buf, from, f.Name(), f.Signature, f.Params)
-	buf.WriteString(":\n")
-
-	if f.Blocks == nil {
-		buf.WriteString("\t(external)\n")
-	}
-
-	// NB. column calculations are confused by non-ASCII
-	// characters and assume 8-space tabs.
-	const punchcard = 80 // for old time's sake.
-	const tabwidth = 8
-	for _, b := range f.Blocks {
-		if b == nil {
-			// Corrupt CFG.
-			fmt.Fprintf(buf, ".nil:\n")
-			continue
-		}
-		n, _ := fmt.Fprintf(buf, "%d:", b.Index)
-		bmsg := fmt.Sprintf("%s P:%d S:%d", b.Comment, len(b.Preds), len(b.Succs))
-		fmt.Fprintf(buf, "%*s%s\n", punchcard-1-n-len(bmsg), "", bmsg)
-
-		if false { // CFG debugging
-			fmt.Fprintf(buf, "\t# CFG: %s --> %s --> %s\n", b.Preds, b, b.Succs)
-		}
-		for _, instr := range b.Instrs {
-			buf.WriteString("\t")
-			switch v := instr.(type) {
-			case Value:
-				l := punchcard - tabwidth
-				// Left-align the instruction.
-				if name := v.Name(); name != "" {
-					n, _ := fmt.Fprintf(buf, "%s = ", name)
-					l -= n
-				}
-				n, _ := buf.WriteString(instr.String())
-				l -= n
-				// Right-align the type if there's space.
-				if t := v.Type(); t != nil {
-					buf.WriteByte(' ')
-					ts := relType(t, from)
-					l -= len(ts) + len("  ") // (spaces before and after type)
-					if l > 0 {
-						fmt.Fprintf(buf, "%*s", l, "")
-					}
-					buf.WriteString(ts)
-				}
-			case nil:
-				// Be robust against bad transforms.
-				buf.WriteString("<deleted>")
-			default:
-				buf.WriteString(instr.String())
-			}
-			buf.WriteString("\n")
-		}
-	}
-	fmt.Fprintf(buf, "\n")
 }
 
 // newBasicBlock adds to f a new basic block and returns it.  It does
@@ -350,3 +254,56 @@ func (f *Function) newBasicBlock(comment string) *BasicBlock {
 }
 
 func (f *Function) Syntax() *ast.FunctionExpr { return f.syntax }
+
+func WriteFunction(b *strings.Builder, f *Function) {
+	for _, fn := range f.Functions {
+		WriteFunction(b, fn)
+	}
+
+	const punchcard = 80 // for old time's sake.
+
+	b.WriteString("\nfunction ")
+	b.WriteString(f.Name())
+	b.WriteString("(")
+	for i, arg := range f.Params {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(arg.String())
+	}
+	if f.VarArg {
+		if len(f.Params) > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("...")
+	}
+	bmsg := fmt.Sprintf("locals:%d upvalues:%d", len(f.Locals), len(f.Upvals))
+	fmt.Fprintf(b, ")%*s%s\n", punchcard-1-len(bmsg)-len(b.String()), "", bmsg)
+
+	for _, block := range f.Blocks {
+		if block == nil {
+			// Corrupt CFG.
+			b.WriteString(".nil:\n")
+			continue
+		}
+
+		n, _ := fmt.Fprintf(b, "%d:", block.Index)
+		bmsg := fmt.Sprintf("%s P:%d S:%d", block.Comment, len(block.Preds), len(block.Succs))
+		fmt.Fprintf(b, "%*s%s\n", punchcard-1-n-len(bmsg), "", bmsg)
+
+		if false { // CFG debugging
+			fmt.Fprintf(b, "\t# CFG: %s --> %s --> %s\n", block.Preds, block, block.Succs)
+		}
+
+		for _, instr := range block.Instrs {
+			b.WriteString("\t")
+			if instr == nil {
+				b.WriteString("<deleted>\n")
+				continue
+			}
+			b.WriteString(instr.String())
+			b.WriteString("\n")
+		}
+	}
+	fmt.Fprintf(b, "end\n")
+}
