@@ -132,7 +132,7 @@ func (f *Function) addLocal(name string) *Local {
 	local := &Local{
 		Comment: name,
 		Value:   Const{nil},
-		num:     len(f.Locals) + 1,
+		Num:     len(f.Locals) + 1,
 	}
 	f.Locals = append(f.Locals, local)
 	f.currentScope.names[name] = local
@@ -142,7 +142,6 @@ func (f *Function) addLocal(name string) *Local {
 func (f *Function) addGlobal(name string) *Global {
 	global := &Global{
 		Comment: name,
-		Value:   Unknown{},
 	}
 	//f.Globals = append(f.Globals, global)
 	return global
@@ -158,11 +157,11 @@ func (f *Function) addFunction( syntax *ast.FunctionExpr) *Function {
 	return fn
 }
 
-// startBody initializes the function prior to generating SSA code for its body.
+// StartBody initializes the function prior to generating SSA code for its body.
 // Precondition: f.Type() already set.
 //
-func (f *Function) startBody() {
-	f.currentBlock = f.newBasicBlock("entry")
+func (f *Function) StartBody() {
+	f.currentBlock = f.NewBasicBlock("entry")
 }
 
 func (f *Function) newScope() *Scope {
@@ -238,11 +237,11 @@ func (f *Function) emit(instr Instruction) Value {
 	return f.currentBlock.emit(instr)
 }
 
-// newBasicBlock adds to f a new basic block and returns it.  It does
+// NewBasicBlock adds to f a new basic block and returns it.  It does
 // not automatically become the current block for subsequent calls to emit.
 // comment is an optional string for more readable debugging output.
 //
-func (f *Function) newBasicBlock(comment string) *BasicBlock {
+func (f *Function) NewBasicBlock(comment string) *BasicBlock {
 	b := &BasicBlock{
 		Index:   len(f.Blocks),
 		Comment: comment,
@@ -260,10 +259,10 @@ func WriteFunction(b *strings.Builder, f *Function) {
 		WriteFunction(b, fn)
 	}
 
-	const punchcard = 80 // for old time's sake.
+	const punchcard = 80
 
 	b.WriteString("\nfunction ")
-	b.WriteString(f.Name())
+	b.WriteString(f.Name)
 	b.WriteString("(")
 	for i, arg := range f.Params {
 		if i != 0 {
@@ -277,7 +276,7 @@ func WriteFunction(b *strings.Builder, f *Function) {
 		}
 		b.WriteString("...")
 	}
-	bmsg := fmt.Sprintf("locals:%d upvalues:%d", len(f.Locals), len(f.Upvals))
+	bmsg := fmt.Sprintf("locals:%d upvalues:%d", len(f.Locals), len(f.UpValues))
 	fmt.Fprintf(b, ")%*s%s\n", punchcard-1-len(bmsg)-len(b.String()), "", bmsg)
 
 	for _, block := range f.Blocks {

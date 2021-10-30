@@ -8,14 +8,6 @@ func (f *Function) emitIf(cond Value, tblock, fblock *BasicBlock) {
 	f.currentBlock = nil
 }
 
-func (f *Function) emitWhile(cond Value, body, done *BasicBlock) {
-	b := f.currentBlock
-	b.emit(&While{Cond: cond})
-	addEdge(b, body)
-	addEdge(b, done)
-	f.currentBlock = nil
-}
-
 func (f *Function) emitGenericFor(locals, values []Value, body, done *BasicBlock) {
 	b := f.currentBlock
 	b.emit(&GenericFor{
@@ -31,9 +23,9 @@ func (f *Function) emitNumberFor(local, init, limit, step Value, body, done *Bas
 	b := f.currentBlock
 	b.emit(&NumberFor{
 		Local: local,
-		Init: init,
+		Init:  init,
 		Limit: limit,
-		Step: step,
+		Step:  step,
 	})
 	addEdge(b, body)
 	addEdge(b, done)
@@ -42,13 +34,13 @@ func (f *Function) emitNumberFor(local, init, limit, step Value, body, done *Bas
 
 func (f *Function) emitCompoundAssign(op string, lhs Value, rhs Value) {
 	f.emit(&CompoundAssign{
-		Op: op,
+		Op:  op,
 		Lhs: lhs,
 		Rhs: rhs,
 	})
 }
 
-func (f *Function) emitAssign(lhs Value, rhs Value) {
+func (f *Function) EmitAssign(lhs Value, rhs Value) {
 	f.emit(&Assign{
 		Lhs: lhs,
 		Rhs: rhs,
@@ -61,7 +53,7 @@ func (f *Function) emitReturn(cond Value, body *BasicBlock, done *BasicBlock) {
 
 func (f *Function) emitLocalAssign(name string, value Value) {
 	local := f.addLocal(name)
-	f.emitAssign(local, value)
+	f.EmitAssign(local, value)
 }
 
 func (f *Function) emitJump(target *BasicBlock) {

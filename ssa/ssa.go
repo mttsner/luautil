@@ -31,27 +31,21 @@ type Variable interface {
 	String() string
 }
 
-type Program struct {
-	Globals *Table
-	Main    *Function
-}
-
 type Function struct {
-	anInstruction
-	name string
-	num  int
-
+	Name      string
+	Params    []*Local // function parameters; for methods, includes receiver
+	Locals    []*Local
+	UpValues  []*Local
+	Functions []*Function   // nested functions defined inside this one
+	Blocks    []*BasicBlock // basic blocks of the function; nil => external
+	VarArg        bool
+	
 	syntax        *ast.FunctionExpr
-	parent        *Function // enclosing function if anon; nil if global
-	Params        []*Local  // function parameters; for methods, includes receiver
-	Locals        []*Local  // local variables of this function
-	Upvals        []*Local
-	Functions     []*Function   // nested functions defined inside this one
-	Blocks        []*BasicBlock // basic blocks of the function; nil => external
+	parent        *Function     // enclosing function if anon; nil if global
 	referrers     []Instruction // referring instructions (iff Parent() != nil)
 	continueBlock *BasicBlock
 	breakBlock    *BasicBlock
-	VarArg        bool
+	num int
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -73,6 +67,7 @@ type BasicBlock struct {
 	Preds, Succs []*BasicBlock  // predecessors and successors
 	succs2       [2]*BasicBlock // initial space for Succs
 	gaps         int            // number of nil Instrs (transient)
+	dom          domInfo        // dominator tree info
 }
 
 type anInstruction struct {
@@ -92,16 +87,14 @@ type Phi struct {
 type Local struct {
 	Comment string
 	Value   Value
-	num     int
+	Num     int
+
+	declared bool
 }
 
 type Global struct {
 	Comment string
 	Value   Value
-}
-
-type Unknown struct {
-	Comment string
 }
 
 type Assign struct {
@@ -120,13 +113,6 @@ type CompoundAssign struct {
 type Return struct {
 	anInstruction
 	//TODO
-}
-
-type While struct {
-	anInstruction
-	Cond Value
-	Body *BasicBlock
-	Done *BasicBlock
 }
 
 type NumberFor struct {
@@ -231,5 +217,6 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 // Non-Instruction Values:
 func (v *Const) Operands(rands []*Value) []*Value    { return rands }
 func (v *Function) Operands(rands []*Value) []*Value { return rands }
-func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
-func (v *Local) Name() string                        { return fmt.Sprintf("t%d", v.num) }
+
+//func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
+func (v *Local) Name() string { return fmt.Sprintf("t%d", v.Num) }
