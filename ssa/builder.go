@@ -6,7 +6,7 @@ import (
 	"github.com/notnoobmaster/luautil/ast"
 )
 
-type builder struct{
+type builder struct {
 	version int
 }
 
@@ -45,7 +45,8 @@ func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 		return tbl
 	case *ast.ArithmeticOpExpr:
 		return Arithmetic{
-			Op:  ex.Operator,
+			Op: ex.Operator,
+
 			Lhs: b.expr(fn, ex.Lhs),
 			Rhs: b.expr(fn, ex.Rhs),
 		}
@@ -106,7 +107,7 @@ func (b *builder) functionExpr(fn *Function, ex *ast.FunctionExpr) Value {
 
 // buildFunction builds SSA code for the body of function fn.  Idempotent.
 func (b *builder) buildFunction(fn *Function) {
-	fn.startBody()
+	fn.StartBody()
 	f := fn.syntax
 	for _, name := range f.ParList.Names {
 		fn.addParam(name)
@@ -123,7 +124,7 @@ func Build(chunk ast.Chunk) *Function {
 			Chunk:   chunk,
 			ParList: &ast.ParList{HasVargs: true},
 		},
-		name: "main",
+		Name: "main",
 	}
 	b.buildFunction(fn)
 	return fn
@@ -131,9 +132,9 @@ func Build(chunk ast.Chunk) *Function {
 
 // repeat stmtemits to fn code for the repeat statement s
 func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
-	loop := fn.newBasicBlock("repeat.loop") // target of 'continue'
-	body := fn.newBasicBlock("repeat.body")
-	done := fn.newBasicBlock("repeat.done") // target of 'break'
+	loop := fn.NewBasicBlock("repeat.loop") // target of 'continue'
+	body := fn.NewBasicBlock("repeat.body")
+	done := fn.NewBasicBlock("repeat.done") // target of 'break'
 
 	fn.emitJump(body)
 	fn.emitReturn(b.expr(fn, s.Condition), body, done)
@@ -145,13 +146,13 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 }
 
 func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
-	loop := fn.newBasicBlock("while.loop") // target of 'continue'
-	body := fn.newBasicBlock("while.body")
-	done := fn.newBasicBlock("while.done") // target of 'break'
+	loop := fn.NewBasicBlock("while.loop") // target of 'continue'
+	body := fn.NewBasicBlock("while.body")
+	done := fn.NewBasicBlock("while.done") // target of 'break'
 
 	fn.emitJump(loop)
 	fn.currentBlock = loop
-	fn.emitWhile(b.expr(fn, s.Condition), body, done)
+	fn.emitIf(b.expr(fn, s.Condition), body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
@@ -160,9 +161,9 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 }
 
 func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
-	loop := fn.newBasicBlock("for.loop") // target of 'continue'
-	body := fn.newBasicBlock("for.body")
-	done := fn.newBasicBlock("for.done") // target of 'break'
+	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
+	body := fn.NewBasicBlock("for.body")
+	done := fn.NewBasicBlock("for.done") // target of 'break'
 
 	local := fn.addLocal(s.Name)
 
@@ -180,9 +181,9 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 }
 
 func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
-	loop := fn.newBasicBlock("for.loop") // target of 'continue'
-	body := fn.newBasicBlock("for.body")
-	done := fn.newBasicBlock("for.done") // target of 'break'
+	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
+	body := fn.NewBasicBlock("for.body")
+	done := fn.NewBasicBlock("for.done") // target of 'break'
 
 	locals := make([]Value, len(s.Names))
 	values := make([]Value, len(s.Exprs))
@@ -219,15 +220,15 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	case *ast.AssignStmt:
 		if len(s.Lhs) <= len(s.Rhs) { // a, b = 1, 2 or a, b = 1, 2, 3
 			for i, ex := range s.Lhs {
-				fn.emitAssign(b.expr(fn, ex), b.expr(fn, s.Rhs[i]))
+				fn.EmitAssign(b.expr(fn, ex), b.expr(fn, s.Rhs[i]))
 			}
 		} else { // a, b = 1
 			i, l, r := 0, len(s.Lhs), len(s.Rhs)
 			for ; i < l; i++ {
-				fn.emitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, s.Rhs[i]))
+				fn.EmitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, s.Rhs[i]))
 			}
 			for ; i < r; i++ {
-				fn.emitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, &ast.NilExpr{}))
+				fn.EmitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, &ast.NilExpr{}))
 			}
 		}
 	case *ast.CompoundAssignStmt:
@@ -274,7 +275,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		b.repeatStmt(fn, s)
 	case *ast.LocalFunctionStmt:
 		f := fn.addFunction(s.Func)
-		f.name = s.Name
+		f.Name = s.Name
 		fn.emitLocalAssign(s.Name, f)
 		b.buildFunction(f)
 	case *ast.FunctionStmt:
@@ -284,29 +285,29 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 			lhs = b.expr(fn, s.Name.Func)
 			switch e := s.Name.Func.(type) {
 			case *ast.IdentExpr: // function func()
-				f.name = e.Value
+				f.Name = e.Value
 			case *ast.AttrGetExpr: // function hoge.func()
-				f.name = e.Key.(*ast.StringExpr).Value
+				f.Name = e.Key.(*ast.StringExpr).Value
 			}
 		} else { // function hoge:func(). We need to prepend self to args and convert the recv and method fields to recv.method .
 			lhs = AttrGet{b.expr(fn, s.Name.Receiver), Const{s.Name.Method}}
-			f.name = s.Name.Method
+			f.Name = s.Name.Method
 			f.addParam("self")
 		}
 		b.buildFunction(f)
-		fn.emitAssign(lhs, f)
+		fn.EmitAssign(lhs, f)
 	case *ast.ReturnStmt:
 		// some some trickery to convert the exprs into useable values
 		// something like
 		// exprs(s.Exprs)
 		//fn.emit(&Return{Results: s.Exprs, pos: s.Return})
-		fn.currentBlock = fn.newBasicBlock("unreachable")
+		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.IfStmt:
-		then := fn.newBasicBlock("if.then")
-		done := fn.newBasicBlock("if.done")
+		then := fn.NewBasicBlock("if.then")
+		done := fn.NewBasicBlock("if.done")
 		els := done
 		if s.Else != nil {
-			els = fn.newBasicBlock("if.else")
+			els = fn.NewBasicBlock("if.else")
 		}
 
 		fn.emitIf(b.expr(fn, s.Condition), then, els) //TODO: convert to jmp stuff like while is
@@ -322,10 +323,10 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		fn.currentBlock = done
 	case *ast.BreakStmt:
 		fn.emitJump(fn.breakBlock)
-		fn.currentBlock = fn.newBasicBlock("unreachable")
+		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.ContinueStmt:
 		fn.emitJump(fn.continueBlock)
-		fn.currentBlock = fn.newBasicBlock("unreachable")
+		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.NumberForStmt:
 		b.numberForStmt(fn, s)
 	case *ast.GenericForStmt:

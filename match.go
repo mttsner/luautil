@@ -196,7 +196,7 @@ func (s *state) repeatEqual(first *ast.RepeatStmt, second *ast.RepeatStmt) bool 
 		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
-func (s *state) funcDefEqual(first *ast.FuncDefStmt, second *ast.FuncDefStmt) bool {
+func (s *state) funcDefEqual(first *ast.LocalFunctionStmt, second *ast.LocalFunctionStmt) bool {
 	// TODO add FuncName equality
 	return s.exprEqual(first.Func, second.Func)
 }
@@ -272,8 +272,8 @@ func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
 				break
 			}
 			return false
-		case *ast.FuncDefStmt:
-			if result, ok := cStmt.(*ast.FuncDefStmt); ok && s.funcDefEqual(stmt, result) {
+		case *ast.LocalFunctionStmt:
+			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
 				break
 			}
 			return false
@@ -385,10 +385,10 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 					return true
 				}	
 			}
-		case *ast.FuncDefStmt:
-			if result, ok := cStmt.(*ast.FuncDefStmt); ok && s.funcDefEqual(stmt, result) {
+		case *ast.LocalFunctionStmt:
+			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
 				success = true
-			} else if result, ok := fStmt.(*ast.FuncDefStmt); ok && s.funcDefEqual(stmt, result) {
+			} else if result, ok := fStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
 				pos = 0
 				success = true
 			} else {

@@ -36,16 +36,16 @@ func TestExpr(t *testing.T) {
 	const input = `
 	-- Expressions
 	local t1, t2, t3, t3, t5 = 1, nil, false, true, "str"	-- Const
-	local t6 = ... 											-- VarArg
-	local t7 = _G.print 									-- AttrGet
-	local t8 = {1,2,3,"str",[5]=nil,hello=""}				-- Table
-	local t9 = 1+1											-- Arithmetic 
+	local t6  = ... 										-- VarArg
+	local t7  = _G.print 									-- AttrGet
+	local t8  = {1,2,3,"str",[5]=nil,hello=""}				-- Table
+	local t9  = 1+1-1*1/1^1									-- Arithmetic 
 	local t10 = ""..""										-- String concat
 	local t11 = 1 < 2										-- Relational
 	local t12 = true and false or true 						-- Logical
 	local t13 = not true									-- Unary
 	local t13 = print() 									-- Call
-	local _ = function() end								-- Function
+	local _   = function() end								-- Function
 	`
 	fn := build(input, t)
 	t.Error(fn.String())

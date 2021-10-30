@@ -14,10 +14,10 @@ type Token struct {
 	Type int
 	Name string
 	Str  string
-	Num float64
+	Num  float64
 	Pos  Position
 }
 
-func (self *Token) String() string {
-	return fmt.Sprintf("<type:%v, str:%v>", self.Name, self.Str)
+func (t *Token) String() string {
+	return fmt.Sprintf("<type:%v, str:%v>", t.Name, t.Str)
 }

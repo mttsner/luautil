@@ -165,16 +165,15 @@ func (s *builder) expr(ex Expr) {
 		}
 		s.Data = &data{} // Reset the data
 	case *UnaryOpExpr:
-		// Skidded from luamin.js
 		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction) {
 			s.Data = &data{Precedence: 8}
 			s.add("(" + e.Operator)
-			s.expr(ex)
+			s.expr(e.Expr)
 			s.add(")")
 		} else {
 			s.Data = &data{Precedence: 8}
 			s.add(e.Operator)
-			s.expr(ex)
+			s.expr(e.Expr)
 		}
 		s.Data = &data{} // Reset the data
 	case *FuncCallExpr:

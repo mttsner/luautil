@@ -6,10 +6,6 @@ import (
 	"strings"
 )
 
-func (s Unknown) String() string {
-	return "<unknown>"
-}
-
 func (s Const) String() string {
 	switch v := s.Value.(type) {
 	case float64:
@@ -104,7 +100,9 @@ func (s Call) String() string {
 func (s *Return) String() string { return "" }
 
 func (f *Function) String() string {
-	return f.Name()
+	b := &strings.Builder{}
+	WriteFunction(b, f)
+	return b.String()
 }
 
 func (s *Jump) String() string {
@@ -132,15 +130,6 @@ func (v *Assign) String() string {
 
 func (v *CompoundAssign) String() string {
 	return fmt.Sprintf("%s %s= %s", v.Lhs, v.Op, v.Rhs)
-}
-
-func (s *While) String() string {
-	tblock, fblock := -1, -1
-	if s.block != nil && len(s.block.Succs) == 2 {
-		tblock = s.block.Succs[0].Index
-		fblock = s.block.Succs[1].Index
-	}
-	return fmt.Sprintf("while %s goto %d else %d ", s.Cond, tblock, fblock)
 }
 
 func (v *NumberFor) String() string {

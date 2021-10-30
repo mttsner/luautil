@@ -12,18 +12,18 @@ type Node struct {
 	lastline int
 }
 
-func (self *Node) Line() int {
-	return self.line
+func (n *Node) Line() int {
+	return n.line
 }
 
-func (self *Node) SetLine(line int) {
-	self.line = line
+func (n *Node) SetLine(line int) {
+	n.line = line
 }
 
-func (self *Node) LastLine() int {
-	return self.lastline
+func (n *Node) LastLine() int {
+	return n.lastline
 }
 
-func (self *Node) SetLastLine(line int) {
-	self.lastline = line
+func (n *Node) SetLastLine(line int) {
+	n.lastline = line
 }
