@@ -9,27 +9,20 @@ import (
 
 func expr(v Value) ast.Expr {
 	switch v := v.(type) {
-	case Const: // This is fucking ugly
-		switch c := v.Value.(type) {
-		case nil:
-			return &ast.NilExpr{}
-		case bool:
-			if c {
-				return &ast.TrueExpr{}
-			} else {
-				return &ast.FalseExpr{}
-			}
-		case float64:
-			return &ast.NumberExpr{Value: c}
-		case string:
-			return &ast.StringExpr{Value: c}
-		default:
-			panic("unimplemented constant type")
-		}
-	case *Local:
-		return &ast.IdentExpr{Value: v.Comment}
+	case Nil:
+		return &ast.NilExpr{}
+	case True:
+		return &ast.TrueExpr{}
+	case False:
+		return &ast.FalseExpr{}
 	case VarArg:
 		return &ast.Comma3Expr{}
+	case Number:
+		return &ast.NumberExpr{Value: v.Value}
+	case String:
+		return &ast.StringExpr{Value: v.Value}
+	case *Local:
+		return &ast.IdentExpr{Value: v.Comment}
 	case AttrGet:
 		return &ast.AttrGetExpr{
 			Object: expr(v.Object),
@@ -73,7 +66,7 @@ func expr(v Value) ast.Expr {
 	}
 }
 
-func (b *BasicBlock) ToAst() (chunk ast.Chunk) {
+func (b *BasicBlock) ToAst(dom domFrontier) (chunk ast.Chunk) {
 	for _, inst := range b.Instrs {
 		switch i := inst.(type) {	
 		case *Assign:	
@@ -89,6 +82,15 @@ func (b *BasicBlock) ToAst() (chunk ast.Chunk) {
 					Rhs: []ast.Expr{expr(i.Rhs)},
 				})
 			}
+		case *If:
+			tFront := dom[b.Succs[0].Index]
+			fFront := dom[b.Succs[1].Index]
+			if len(tFront) == len(fFront) &&
+				tFront[0].Index == fFront[0].Index {
+				panic("if then end")
+			} else {
+				panic("if then else end")
+			}
 		default:
 			panic("reached")
 		}
@@ -98,12 +100,27 @@ func (b *BasicBlock) ToAst() (chunk ast.Chunk) {
 }
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
-	// prob should work downwards from root and not loop
-	for _, b := range f.Blocks {
-		chunk = append(chunk, b.ToAst()...)
-		if len(b.Succs) == 2 {
-			// might be if statement
-		}
-	}
-	return 
+	root := f.Blocks[0]
+	return root.ToAst()
 }
+
+/* 
+if cond then
+	...
+end
+
+if cond then
+	...
+else
+	...
+end
+
+while cond do 
+	...
+end
+
+repeat
+	...
+until cond end
+
+*/

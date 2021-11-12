@@ -131,7 +131,7 @@ func (f *Function) addParam(name string) {
 func (f *Function) addLocal(name string) *Local {
 	local := &Local{
 		Comment: name,
-		Value:   Const{nil},
+		Value:   Nil{},
 		Num:     len(f.Locals) + 1,
 	}
 	f.Locals = append(f.Locals, local)

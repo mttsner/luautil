@@ -6,26 +6,24 @@ import (
 	"github.com/notnoobmaster/luautil/ast"
 )
 
-type builder struct {
-	version int
-}
+type builder struct {}
 
 func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 	switch ex := expr.(type) {
-	case *ast.NumberExpr:
-		return Const{Value: ex.Value}
 	case *ast.NilExpr:
-		return Const{Value: nil}
+		return Nil{}
 	case *ast.FalseExpr:
-		return Const{Value: false}
+		return False{}
 	case *ast.TrueExpr:
-		return Const{Value: true}
+		return True{}
+	case *ast.NumberExpr:
+		return Number{ex.Value}
+	case *ast.StringExpr:
+		return String{ex.Value}
 	case *ast.IdentExpr:
 		return fn.lookup(ex.Value)
 	case *ast.Comma3Expr:
 		return VarArg{}
-	case *ast.StringExpr:
-		return Const{Value: ex.Value}
 	case *ast.AttrGetExpr:
 		return AttrGet{
 			Object: b.expr(fn, ex.Object),
@@ -290,7 +288,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 				f.Name = e.Key.(*ast.StringExpr).Value
 			}
 		} else { // function hoge:func(). We need to prepend self to args and convert the recv and method fields to recv.method .
-			lhs = AttrGet{b.expr(fn, s.Name.Receiver), Const{s.Name.Method}}
+			lhs = AttrGet{b.expr(fn, s.Name.Receiver), String{s.Name.Method}}
 			f.Name = s.Name.Method
 			f.addParam("self")
 		}
