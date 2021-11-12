@@ -30,3 +30,17 @@ func formatString(str string) string {
 	}
 	return b.String()
 }
+
+func (s *builder) wrapIfNeeded(precedence int, associativity bool, op string, lhs Expr, rhs Expr, d data) {
+	if precedence < d.Precedence || associativity != d.Direction {
+		s.add("(")
+		s.expr(lhs, data{precedence, false, op})
+		s.addpad(op)
+		s.expr(rhs, data{precedence, true, op})
+		s.add(")")
+		return
+	}
+	s.expr(lhs, data{precedence, false, op})
+	s.addpad(op)
+	s.expr(rhs, data{precedence, true, op})
+}

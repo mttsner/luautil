@@ -2,6 +2,7 @@ package luautil
 
 import (
 	_ "embed"
+	"os"
 	"strings"
 	"testing"
 )
@@ -10,5 +11,14 @@ import (
 var test string
 
 func TestBeautify(t *testing.T) {
-	t.Error(Beautify(strings.NewReader(test)))
+	f, err := os.Create("test.lua")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	str, err := Beautify(strings.NewReader(test))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(str)
 }

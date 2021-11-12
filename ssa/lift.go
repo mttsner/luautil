@@ -1,5 +1,14 @@
 package ssa 
 
+// domFrontier maps each block to the set of blocks in its dominance
+// frontier.  The outer slice is conceptually a map keyed by
+// Block.Index.  The inner slice is conceptually a set, possibly
+// containing duplicates.
+//
+// domFrontier's methods mutate the slice's elements but not its
+// length, so their receivers needn't be pointers.
+//
+
 type domFrontier [][]*BasicBlock
 
 func (df domFrontier) add(u, v *BasicBlock) {

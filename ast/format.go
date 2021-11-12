@@ -14,16 +14,15 @@ type data struct {
 type builder struct {
 	Str    *strings.Builder
 	Indent int
-	Data   *data
 }
 
 // Helper functions
-func (s *builder) add(str string)    { s.Str.WriteString(str) }
-func (s *builder) addln(str string)  { s.Str.WriteString(str + "\n") }
-func (s *builder) addrune(r rune)    { s.Str.WriteRune(r) }
-func (s *builder) addpad(str string) { s.Str.WriteString(" " + str + " ") }
-func (s *builder) tab() *builder     { s.Str.WriteString(strings.Repeat("\t", s.Indent)); return s }
-func (s *builder) wrap(e Expr)       { s.add("("); s.expr(e); s.add(")") }
+func (s *builder) add(str string)      { s.Str.WriteString(str) }
+func (s *builder) addln(str string)    { s.Str.WriteString(str + "\n") }
+func (s *builder) addrune(r rune)      { s.Str.WriteRune(r) }
+func (s *builder) addpad(str string)   { s.Str.WriteString(" " + str + " ") }
+func (s *builder) tab() *builder       { s.Str.WriteString(strings.Repeat("\t", s.Indent)); return s }
+func (s *builder) wrap(e Expr, d data) { s.add("("); s.expr(e, d); s.add(")") }
 
 func (s *builder) addcomma(idx int, length int) {
 	if idx < length-1 {
@@ -31,7 +30,7 @@ func (s *builder) addcomma(idx int, length int) {
 	}
 }
 
-func (s *builder) expr(ex Expr) {
+func (s *builder) expr(ex Expr, d data) {
 	switch e := ex.(type) {
 	case *NumberExpr:
 		s.add(strconv.FormatFloat(e.Value, 'f', -1, 64))
@@ -52,15 +51,15 @@ func (s *builder) expr(ex Expr) {
 	case *AttrGetExpr:
 		switch obj := e.Object.(type) {
 		case *IdentExpr, *AttrGetExpr:
-			s.expr(e.Object)
+			s.expr(e.Object, d)
 		case *StringExpr:
 			if obj.Value == "" {
 				s.add("string")
 				break
 			}
-			s.wrap(e.Object)
+			s.wrap(e.Object, d)
 		default:
-			s.wrap(e.Object)
+			s.wrap(e.Object, d)
 		}
 
 		if str, ok := e.Key.(*StringExpr); ok && isValid(str.Value) {
@@ -68,7 +67,7 @@ func (s *builder) expr(ex Expr) {
 			s.add(str.Value)
 		} else {
 			s.add("[")
-			s.expr(e.Key)
+			s.expr(e.Key, d)
 			s.add("]")
 		}
 	case *TableExpr:
@@ -83,12 +82,12 @@ func (s *builder) expr(ex Expr) {
 					s.add(str.Value)
 				} else {
 					s.add("[")
-					s.expr(field.Key)
+					s.expr(field.Key, d)
 					s.add("]")
 				}
 				s.add(" = ")
 			}
-			s.expr(field.Value)
+			s.expr(field.Value, d)
 			if idx < length-1 {
 				s.Str.WriteRune(',')
 				continue
@@ -100,99 +99,52 @@ func (s *builder) expr(ex Expr) {
 		}
 		s.Indent--
 		s.add("}")
-	case *ArithmeticOpExpr, *StringConcatOpExpr, *RelationalOpExpr, *LogicalOpExpr:
-		var currentPrecedence int
-		var operator string
-		var associativity bool
-		var Lhs Expr
-		var Rhs Expr
-
-		switch ex := ex.(type) {
-		case *LogicalOpExpr:
-			switch ex.Operator {
-			case "or":
-				currentPrecedence = 1
-			case "and":
-				currentPrecedence = 2
-			}
-			operator = ex.Operator
-			Lhs = ex.Lhs
-			Rhs = ex.Rhs
-		case *RelationalOpExpr:
-			currentPrecedence = 3
-			operator = ex.Operator
-			Lhs = ex.Lhs
-			Rhs = ex.Rhs
-		case *StringConcatOpExpr:
-			currentPrecedence = 5
-			operator = ".."
-			associativity = true
-			Lhs = ex.Lhs
-			Rhs = ex.Rhs
-		case *ArithmeticOpExpr:
-			switch ex.Operator {
-			case "+", "-":
-				currentPrecedence = 6
-			case "*", "/", "%":
-				currentPrecedence = 7
-			case "^":
-				currentPrecedence = 10
-				associativity = true
-			}
-			operator = ex.Operator
-			Lhs = ex.Lhs
-			Rhs = ex.Rhs
-		}
-
-		if currentPrecedence < s.Data.Precedence ||
-			(currentPrecedence == s.Data.Precedence &&
-				associativity != s.Data.Direction &&
-				s.Data.Parent != "+" &&
-				!(s.Data.Parent == "*" && (operator == "/" || operator == "*"))) {
-			s.add("(")
-			s.Data = &data{currentPrecedence, false, operator}
-			s.expr(Lhs)
-			s.addpad(operator)
-			s.Data = &data{currentPrecedence, true, operator}
-			s.expr(Rhs)
-			s.add(")")
+	case *LogicalOpExpr:
+		if e.Operator == "or" {
+			s.wrapIfNeeded(1, false, "or", e.Lhs, e.Rhs, d)
 		} else {
-			s.Data = &data{currentPrecedence, false, operator}
-			s.expr(Lhs)
-			s.addpad(operator)
-			s.Data = &data{currentPrecedence, true, operator}
-			s.expr(Rhs)
+			s.wrapIfNeeded(2, false, "and", e.Lhs, e.Rhs, d)
 		}
-		s.Data = &data{} // Reset the data
+	case *RelationalOpExpr:
+		s.wrapIfNeeded(3, false, e.Operator, e.Lhs, e.Rhs, d)
+	case *StringConcatOpExpr:
+		s.wrapIfNeeded(5, true, "..", e.Lhs, e.Rhs, d)
+	case *ArithmeticOpExpr:
+		switch e.Operator {
+		case "+", "-":
+			s.wrapIfNeeded(6, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "*", "/", "%":
+			s.wrapIfNeeded(7, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "^":
+			s.wrapIfNeeded(10, false, "^", e.Lhs, e.Rhs, d)
+		}
 	case *UnaryOpExpr:
-		if 8 < s.Data.Precedence && !((s.Data.Parent == "^") && s.Data.Direction) {
-			s.Data = &data{Precedence: 8}
-			s.add("(" + e.Operator)
-			s.expr(e.Expr)
+		if 8 < d.Precedence || d.Direction {
+			s.add("(")
+			s.add(e.Operator)
+			s.expr(e.Expr, data{Precedence: 8})
 			s.add(")")
 		} else {
-			s.Data = &data{Precedence: 8}
 			s.add(e.Operator)
-			s.expr(e.Expr)
+			s.expr(e.Expr, data{Precedence: 8})
 		}
-		s.Data = &data{} // Reset the data
 	case *FuncCallExpr:
 		if e.Func != nil { // hoge.func()
 			switch e.Func.(type) {
 			case *IdentExpr, *TableExpr, *AttrGetExpr:
-				s.expr(e.Func)
+				s.expr(e.Func, d)
 			default:
-				s.wrap(e.Func)
+				s.wrap(e.Func, d)
 			}
 		} else { // hoge:method()
-			s.expr(e.Receiver)
+			s.expr(e.Receiver, d)
 			s.add(":")
 			s.add(e.Method)
 		}
 
 		s.add("(")
 		for i := range e.Args {
-			s.expr(e.Args[i])
+			s.expr(e.Args[i], d)
 			s.addcomma(i, len(e.Args))
 		}
 		s.add(")")
@@ -211,6 +163,8 @@ func (s *builder) expr(ex Expr) {
 		s.addln(")")
 		s.chunk(e.Chunk)
 		s.tab().add("end")
+	default:
+		panic("Unimplemented expression")
 	}
 }
 
@@ -218,7 +172,7 @@ func (s *builder) elseBody(elseStmt []Stmt) {
 	if len(elseStmt) > 0 {
 		if elseif, ok := elseStmt[0].(*IfStmt); ok && len(elseStmt) == 1 {
 			s.tab().add("elseif ")
-			s.expr(elseif.Condition)
+			s.expr(elseif.Condition, data{})
 			s.addln(" then")
 			s.chunk(elseif.Then)
 			s.elseBody(elseif.Else)
@@ -242,22 +196,22 @@ func (s *builder) stmt(st Stmt) {
 	switch stmt := st.(type) {
 	case *AssignStmt:
 		for i, ex := range stmt.Lhs {
-			s.expr(ex)
+			s.expr(ex, data{})
 			s.addcomma(i, len(stmt.Lhs))
 		}
 		s.addpad("=")
 		for i, ex := range stmt.Rhs {
-			s.expr(ex)
+			s.expr(ex, data{})
 			s.addcomma(i, len(stmt.Rhs))
 		}
 	case *CompoundAssignStmt:
 		for i, ex := range stmt.Lhs {
-			s.expr(ex)
+			s.expr(ex, data{})
 			s.addcomma(i, len(stmt.Lhs))
 		}
 		s.addpad(stmt.Operator)
 		for i, ex := range stmt.Rhs {
-			s.expr(ex)
+			s.expr(ex, data{})
 			s.addcomma(i, len(stmt.Rhs))
 		}
 	case *LocalAssignStmt:
@@ -269,7 +223,7 @@ func (s *builder) stmt(st Stmt) {
 		if len(stmt.Exprs) > 0 {
 			s.add(" = ")
 			for i, ex := range stmt.Exprs {
-				s.expr(ex)
+				s.expr(ex, data{})
 				s.addcomma(i, len(stmt.Exprs))
 			}
 		}
@@ -278,19 +232,19 @@ func (s *builder) stmt(st Stmt) {
 		if ex.Func != nil {
 			switch ex.Func.(type) {
 			case *IdentExpr, *TableExpr, *AttrGetExpr:
-				s.expr(ex.Func)
+				s.expr(ex.Func, data{})
 			default:
-				s.wrap(ex.Func)
+				s.wrap(ex.Func, data{})
 			}
 		} else {
-			s.expr(ex.Receiver)
+			s.expr(ex.Receiver, data{})
 			s.add(":")
 			s.add(ex.Method)
 		}
 
 		s.add("(")
 		for i := range ex.Args {
-			s.expr(ex.Args[i])
+			s.expr(ex.Args[i], data{})
 			s.addcomma(i, len(ex.Args))
 		}
 		s.add(")")
@@ -300,7 +254,7 @@ func (s *builder) stmt(st Stmt) {
 		s.tab().add("end")
 	case *WhileStmt:
 		s.add("while ")
-		s.expr(stmt.Condition)
+		s.expr(stmt.Condition, data{})
 		s.addln(" do")
 		s.chunk(stmt.Chunk)
 		s.tab().add("end")
@@ -308,15 +262,19 @@ func (s *builder) stmt(st Stmt) {
 		s.addln("repeat")
 		s.chunk(stmt.Chunk)
 		s.tab().add("until ")
-		s.expr(stmt.Condition)
+		s.expr(stmt.Condition, data{})
+	case *LocalFunctionStmt:
+		s.add("local function ")
+		s.add(stmt.Name)
+		s.expr(stmt.Func, data{})
 	case *FunctionStmt:
 		s.add("function ")
 		if stmt.Name.Func == nil {
-			s.expr(stmt.Name.Receiver)
+			s.expr(stmt.Name.Receiver, data{})
 			s.Str.WriteRune(':')
 			s.add(stmt.Name.Method)
 		} else {
-			s.expr(stmt.Name.Func)
+			s.expr(stmt.Name.Func, data{})
 		}
 		s.addrune('(')
 		for i, name := range stmt.Func.ParList.Names {
@@ -329,12 +287,12 @@ func (s *builder) stmt(st Stmt) {
 	case *ReturnStmt:
 		s.add("return ")
 		for i, ex := range stmt.Exprs {
-			s.expr(ex)
+			s.expr(ex, data{})
 			s.addcomma(i, len(stmt.Exprs))
 		}
 	case *IfStmt:
 		s.add("if ")
-		s.expr(stmt.Condition)
+		s.expr(stmt.Condition, data{})
 		s.addln(" then")
 		s.chunk(stmt.Then)
 		s.elseBody(stmt.Else)
@@ -347,12 +305,12 @@ func (s *builder) stmt(st Stmt) {
 		s.add("for ")
 		s.add(stmt.Name)
 		s.add(" = ")
-		s.expr(stmt.Init)
+		s.expr(stmt.Init, data{})
 		s.add(", ")
-		s.expr(stmt.Limit)
+		s.expr(stmt.Limit, data{})
 		if stmt.Step != nil {
 			s.add(", ")
-			s.expr(stmt.Step)
+			s.expr(stmt.Step, data{})
 		}
 		s.addln(" do")
 		s.chunk(stmt.Chunk)
@@ -364,13 +322,15 @@ func (s *builder) stmt(st Stmt) {
 			s.addcomma(i, len(stmt.Names))
 		}
 		s.add(" in ")
-		for _, ex := range stmt.Exprs {
-			s.expr(ex)
+		for i, ex := range stmt.Exprs {
+			s.expr(ex, data{})
+			s.addcomma(i, len(stmt.Exprs))
 		}
 		s.addln(" do")
 		s.chunk(stmt.Chunk)
 		s.tab().add("end")
+	default:
+		panic("Unimplemented statement")
 	}
 	s.add(";\n")
-
 }

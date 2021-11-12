@@ -6,23 +6,17 @@ import (
 	"strings"
 )
 
-func (s Const) String() string {
-	switch v := s.Value.(type) {
-	case float64:
-		return strconv.FormatFloat(v, 'f', -1, 64)
-	case string:
-		return "\""+v+"\""
-	case bool:
-		return strconv.FormatBool(v)
-	case nil:
-		return "nil"
-	default:
-		panic("Unexpected type while parsing const")
-	}
+func (s Nil) String() string { return "nil" }
+func (s True) String() string { return "true" }
+func (s False) String() string { return "false" }
+func (s VarArg) String() string { return "..." }
+
+func (s Number) String() string {
+	return strconv.FormatFloat(s.Value, 'f', -1, 64)
 }
 
-func (s VarArg) String() string {
-	return "..."
+func (s String) String() string {
+	return strconv.Quote(s.Value)
 }
 
 func (s Table) String() string {

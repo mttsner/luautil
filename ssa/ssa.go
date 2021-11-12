@@ -144,8 +144,18 @@ type Call struct {
 
 // Expressions
 
-type Const struct {
-	Value interface{}
+type Nil struct {}
+
+type True struct {}
+
+type False struct {}
+
+type Number struct {
+	Value float64
+}
+
+type String struct {
+	Value string
 }
 
 type VarArg struct{}
@@ -215,7 +225,7 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 }
 
 // Non-Instruction Values:
-func (v *Const) Operands(rands []*Value) []*Value    { return rands }
+//func (v *Const) Operands(rands []*Value) []*Value    { return rands }
 func (v *Function) Operands(rands []*Value) []*Value { return rands }
 
 //func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
