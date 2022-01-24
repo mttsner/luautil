@@ -8,6 +8,8 @@ import (
 )
 
 const target = `
+local function a() end
+
 local function Wrap(Chunk, _IdentExpr_, Env)
 	local Instr = Chunk[1];
 	local Proto = Chunk[2];
