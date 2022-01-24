@@ -88,6 +88,8 @@ func (s *state) exprEqual(expr ast.Expr, selector ast.Expr) bool {
 		if ident, ok := selector.(*ast.IdentExpr); ok {
 			if ident.Value == "_IdentExpr_" {	
 				s.Exprs = append(s.Exprs, ex)
+			} else if ident.Value == "_FunctionExpr_" {
+				s.Exprs = append(s.Exprs, ex)
 			}
 			return true
 		}
@@ -196,8 +198,15 @@ func (s *state) repeatEqual(first *ast.RepeatStmt, second *ast.RepeatStmt) bool 
 		s.stmtsEqual(first.Chunk, second.Chunk)
 }
 
-func (s *state) funcDefEqual(first *ast.LocalFunctionStmt, second *ast.LocalFunctionStmt) bool {
-	// TODO add FuncName equality
+func (s *state) localFunctionEqual(first *ast.LocalFunctionStmt, second *ast.LocalFunctionStmt) bool {
+	if second.Name == "_LocalFunctionStmt_" {
+		s.Chunk = append(s.Chunk, first)
+		return true
+	}
+	return s.exprEqual(first.Func, second.Func)
+}
+
+func (s *state) functionEqual(first *ast.FunctionStmt, second *ast.FunctionStmt) bool {
 	return s.exprEqual(first.Func, second.Func)
 }
 
@@ -273,7 +282,12 @@ func (s *state) stmtsEqual(chunk []ast.Stmt, pattern []ast.Stmt) bool {
 			}
 			return false
 		case *ast.LocalFunctionStmt:
-			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
+			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.localFunctionEqual(stmt, result) {
+				break
+			}
+			return false
+		case *ast.FunctionStmt:
+			if result, ok := cStmt.(*ast.FunctionStmt); ok && s.functionEqual(stmt, result) {
 				break
 			}
 			return false
@@ -386,9 +400,18 @@ func (s *state) match(chunk []ast.Stmt) (success bool) {
 				}	
 			}
 		case *ast.LocalFunctionStmt:
-			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
+			if result, ok := cStmt.(*ast.LocalFunctionStmt); ok && s.localFunctionEqual(stmt, result) {
 				success = true
-			} else if result, ok := fStmt.(*ast.LocalFunctionStmt); ok && s.funcDefEqual(stmt, result) {
+			} else if result, ok := fStmt.(*ast.LocalFunctionStmt); ok && s.localFunctionEqual(stmt, result) {
+				pos = 0
+				success = true
+			} else {
+				s.quickTraverseExpr(stmt.Func)
+			}
+		case *ast.FunctionStmt:
+			if result, ok := cStmt.(*ast.FunctionStmt); ok && s.functionEqual(stmt, result) {
+				success = true
+			} else if result, ok := fStmt.(*ast.FunctionStmt); ok && s.functionEqual(stmt, result) {
 				pos = 0
 				success = true
 			} else {
