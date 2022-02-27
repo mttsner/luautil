@@ -1,7 +1,8 @@
 package ast
+
 import (
-	"fmt"
 	"strings"
+	"strconv"
 )
 
 func isValid(str string) bool {
@@ -14,20 +15,54 @@ func isValid(str string) bool {
 	return true
 }
 
+// TODO: If it's a invalid char then peek the next char and check if it's a number. 
+// In some edge cases like \10\48 it might break.
+// However, for now the whole string is going to be escaped if any character is invalid
 func formatString(str string) string {
 	b := strings.Builder{}
-	for i, ch := range str {
+	b.Grow(len(str)) // Min size of the output string.
+
+	for _, ch := range str {
 		switch ch {
-		case '\a', '\b', '\f', '\n', '\r', '\t', '\v', '\\', '"':
-			b.WriteRune('\\')
-			b.WriteRune(ch)
-		case 65533:
-			b.WriteRune('\\')
-			b.WriteString(fmt.Sprint([]byte(str)[i]))
+		case '\a':
+			b.WriteString("\\a")
+		case '\b':
+			b.WriteString("\\b")
+		case '\f':
+			b.WriteString("\\f")
+		case '\n':
+			b.WriteString("\\n")
+		case '\r':
+			b.WriteString("\\r")
+		case '\t':
+			b.WriteString("\\t")
+		case '\v':
+			b.WriteString("\\v")
+		case '\\':
+			b.WriteString("\\\\")
+		case '"':
+			b.WriteString("\\\"")
 		default:
-			b.WriteRune(ch)
+			if ch < ' ' || ch > '~' {
+				return escapeString(str)
+			} else {
+				b.WriteRune(ch)
+			}
 		}
 	}
+	return b.String()
+}
+
+// Escapes every character in string
+func escapeString(str string) string {
+	b := strings.Builder{}
+	b.Grow(len(str)) // Min size of the output string.
+
+	for i := range str {
+		b.WriteRune('\\')
+		b.WriteString(strconv.Itoa(int([]byte(str)[i])))
+	}
+
 	return b.String()
 }
 
