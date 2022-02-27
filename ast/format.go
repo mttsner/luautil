@@ -231,13 +231,18 @@ func (s *builder) stmt(st Stmt) {
 		ex := stmt.Expr.(*FuncCallExpr)
 		if ex.Func != nil {
 			switch ex.Func.(type) {
-			case *IdentExpr, *TableExpr, *AttrGetExpr:
+			case *IdentExpr, *AttrGetExpr:
 				s.expr(ex.Func, data{})
 			default:
 				s.wrap(ex.Func, data{})
 			}
 		} else {
-			s.expr(ex.Receiver, data{})
+			switch ex.Receiver.(type) {
+			case *IdentExpr, *AttrGetExpr:
+				s.expr(ex.Receiver, data{})
+			default:
+				s.wrap(ex.Receiver, data{})
+			}
 			s.add(":")
 			s.add(ex.Method)
 		}
