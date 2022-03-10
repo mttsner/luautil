@@ -131,13 +131,18 @@ func (s *builder) expr(ex Expr, d data) {
 	case *FuncCallExpr:
 		if e.Func != nil { // hoge.func()
 			switch e.Func.(type) {
-			case *IdentExpr, *TableExpr, *AttrGetExpr:
+			case *IdentExpr, *AttrGetExpr:
 				s.expr(e.Func, d)
 			default:
 				s.wrap(e.Func, d)
 			}
 		} else { // hoge:method()
-			s.expr(e.Receiver, d)
+			switch e.Receiver.(type) {
+			case *IdentExpr, *AttrGetExpr:
+				s.expr(e.Receiver, data{})
+			default:
+				s.wrap(e.Receiver, data{})
+			}
 			s.add(":")
 			s.add(e.Method)
 		}
