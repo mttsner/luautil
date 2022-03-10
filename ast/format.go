@@ -276,7 +276,14 @@ func (s *builder) stmt(st Stmt) {
 	case *LocalFunctionStmt:
 		s.add("local function ")
 		s.add(stmt.Name)
-		s.expr(stmt.Func, data{})
+		s.addrune('(')
+		for i, name := range stmt.Func.ParList.Names {
+			s.add(name)
+			s.addcomma(i, len(stmt.Func.ParList.Names))
+		}
+		s.addln(")")
+		s.chunk(stmt.Func.Chunk)
+		s.tab().add("end")
 	case *FunctionStmt:
 		s.add("function ")
 		if stmt.Name.Func == nil {
