@@ -281,6 +281,12 @@ func (s *builder) stmt(st Stmt) {
 			s.add(name)
 			s.addcomma(i, len(stmt.Func.ParList.Names))
 		}
+		if stmt.Func.ParList.HasVargs {
+			if len(stmt.Func.ParList.Names) > 0 {
+				s.add(", ")
+			}
+			s.add("...")
+		}
 		s.addln(")")
 		s.chunk(stmt.Func.Chunk)
 		s.tab().add("end")
@@ -297,6 +303,13 @@ func (s *builder) stmt(st Stmt) {
 		for i, name := range stmt.Func.ParList.Names {
 			s.add(name)
 			s.addcomma(i, len(stmt.Func.ParList.Names))
+		}
+
+		if stmt.Func.ParList.HasVargs {
+			if len(stmt.Func.ParList.Names) > 0 {
+				s.add(", ")
+			}
+			s.add("...")
 		}
 		s.addln(")")
 		s.chunk(stmt.Func.Chunk)
