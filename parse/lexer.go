@@ -33,14 +33,14 @@ func (e *Error) Error() string {
 
 func writeChar(buf *bytes.Buffer, c int) { buf.WriteByte(byte(c)) }
 
-func isDecimal(ch int) bool { return ch == '_' || '0' <= ch && ch <= '9' }
+func isDecimal(ch int) bool { return '0' <= ch && ch <= '9' }
 
-func isOctal(ch int) bool { return ch == '_' || '0' <= ch && ch <= '7' }
+func isOctal(ch int) bool { return '0' <= ch && ch <= '7' }
 
-func isBinary(ch int) bool { return ch == '_' || ch == '0' || ch == '1' }
+func isBinary(ch int) bool { return ch == '0' || ch == '1' }
 
 func isDigit(ch int) bool {
-	return ch == '_' || '0' <= ch && ch <= '9' || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
+	return '0' <= ch && ch <= '9' || 'a' <= ch && ch <= 'f' || 'A' <= ch && ch <= 'F'
 }
 
 func isIdent(ch int, pos int) bool {
@@ -148,7 +148,11 @@ func (sc *Scanner) scanIdent(ch int, buf *bytes.Buffer) error {
 
 func (sc *Scanner) scanDecimal(ch int, buf *bytes.Buffer) error {
 	writeChar(buf, ch)
-	for isDecimal(sc.Peek()) {
+	for isDecimal(sc.Peek()) || sc.Peek() == '_' {
+		if sc.Peek() == '_' { 
+			sc.Next()
+			continue 
+		}
 		writeChar(buf, sc.Next())
 	}
 	return nil
@@ -164,7 +168,7 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 				writeChar(buf, n)
 				return 0, sc.Error(buf.String(), "hex number expected")
 			}
-			for isDigit(sc.Peek()) {
+			for isDigit(sc.Peek())  || sc.Peek() == '_' {
 				if sc.Peek() == '_' { 
 					sc.Next()
 					continue 
@@ -175,12 +179,12 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 			return float64(val), nil
 		case 'b', 'B':
 			n := sc.Next()
-			if !isDigit(sc.Peek()) {
+			if !isBinary(sc.Peek()) {
 				writeChar(buf, ch)
 				writeChar(buf, n)
 				return 0, sc.Error(buf.String(), "binary number expected")
 			}
-			for isBinary(sc.Peek()) {
+			for isBinary(sc.Peek()) || sc.Peek() == '_' {
 				if sc.Peek() == '_' { 
 					sc.Next()
 					continue 
@@ -191,12 +195,12 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 			return float64(val), nil
 		case 'o', 'O':
 			n := sc.Next()
-			if !isDigit(sc.Peek()) {
+			if !isOctal(sc.Peek()) {
 				writeChar(buf, ch)
 				writeChar(buf, n)
 				return 0, sc.Error(buf.String(), "octal number expected")
 			}
-			for isOctal(sc.Peek()) {
+			for isOctal(sc.Peek())  || sc.Peek() == '_' {
 				if sc.Peek() == '_' { 
 					sc.Next()
 					continue 
