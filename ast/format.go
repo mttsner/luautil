@@ -3,6 +3,8 @@ package ast
 import (
 	"strconv"
 	"strings"
+
+	"github.com/notnoobmaster/luautil"
 )
 
 type data struct {
@@ -45,9 +47,7 @@ func (s *builder) expr(ex Expr, d data) {
 	case *Comma3Expr:
 		s.add("...")
 	case *StringExpr:
-		s.addrune('"')
-		s.add(formatString(e.Value))
-		s.addrune('"')
+		s.add(luautil.Quote(e.Value))
 	case *AttrGetExpr:
 		switch obj := e.Object.(type) {
 		case *IdentExpr, *AttrGetExpr:
@@ -116,7 +116,7 @@ func (s *builder) expr(ex Expr, d data) {
 		case "*", "/", "%":
 			s.wrapIfNeeded(7, false, e.Operator, e.Lhs, e.Rhs, d)
 		case "^":
-			s.wrapIfNeeded(10, false, "^", e.Lhs, e.Rhs, d)
+			s.wrapIfNeeded(10, true, "^", e.Lhs, e.Rhs, d)
 		}
 	case *UnaryOpExpr:
 		if 8 < d.Precedence || d.Direction {
@@ -315,10 +315,13 @@ func (s *builder) stmt(st Stmt) {
 		s.chunk(stmt.Func.Chunk)
 		s.tab().add("end")
 	case *ReturnStmt:
-		s.add("return ")
-		for i, ex := range stmt.Exprs {
-			s.expr(ex, data{})
-			s.addcomma(i, len(stmt.Exprs))
+		s.add("return")
+		if len(stmt.Exprs) > 0 {
+			s.add(" ")
+			for i, ex := range stmt.Exprs {
+				s.expr(ex, data{})
+				s.addcomma(i, len(stmt.Exprs))
+			}
 		}
 	case *IfStmt:
 		s.add("if ")
