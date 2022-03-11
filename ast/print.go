@@ -3,6 +3,8 @@ package ast
 import (
 	"strconv"
 	"strings"
+
+	"github.com/notnoobmaster/luautil"
 )
 
 func (c Chunk) String() string { 
@@ -27,7 +29,7 @@ func (v *NumberExpr) String() string {
 }
 
 func (v *StringExpr) String() string {
-	return "\"" + formatString(v.Value) + "\""
+	return luautil.Quote(v.Value)
 }
 
 // We pass the value to b.expr because we need to know the indentation level and carry some state.
