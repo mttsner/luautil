@@ -108,25 +108,35 @@ func (s *builder) expr(ex Expr, d data) {
 	case *RelationalOpExpr:
 		s.wrapIfNeeded(3, false, e.Operator, e.Lhs, e.Rhs, d)
 	case *StringConcatOpExpr:
-		s.wrapIfNeeded(5, true, "..", e.Lhs, e.Rhs, d)
+		s.wrapIfNeeded(8, true, "..", e.Lhs, e.Rhs, d)
 	case *ArithmeticOpExpr:
 		switch e.Operator {
-		case "+", "-":
+		case "|":
+			s.wrapIfNeeded(4, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "~":
+			s.wrapIfNeeded(5, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "&":
 			s.wrapIfNeeded(6, false, e.Operator, e.Lhs, e.Rhs, d)
-		case "*", "/", "%":
+		case "<<", ">>":
 			s.wrapIfNeeded(7, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "+", "-":
+			s.wrapIfNeeded(9, false, e.Operator, e.Lhs, e.Rhs, d)
+		case "*", "/", "//", "%":
+			s.wrapIfNeeded(10, false, e.Operator, e.Lhs, e.Rhs, d)
 		case "^":
-			s.wrapIfNeeded(10, true, "^", e.Lhs, e.Rhs, d)
+			s.wrapIfNeeded(12, true, e.Operator, e.Lhs, e.Rhs, d)
+		default:
+			panic("Unimplemented arithmetic operator: " + e.Operator)
 		}
 	case *UnaryOpExpr:
 		if 8 < d.Precedence || d.Direction {
 			s.add("(")
 			s.add(e.Operator)
-			s.expr(e.Expr, data{Precedence: 8})
+			s.expr(e.Expr, data{Precedence: 11})
 			s.add(")")
 		} else {
 			s.add(e.Operator)
-			s.expr(e.Expr, data{Precedence: 8})
+			s.expr(e.Expr, data{Precedence: 11})
 		}
 	case *FuncCallExpr:
 		if e.Func != nil { // hoge.func()

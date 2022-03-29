@@ -370,11 +370,11 @@ expr:
             $$.SetLine($1.Line())
         } |
         expr TRshift expr {
-            $$ = &ast.RelationalOpExpr{Lhs: $1, Operator: ">>", Rhs: $3}
+            $$ = &ast.ArithmeticOpExpr{Lhs: $1, Operator: ">>", Rhs: $3}
             $$.SetLine($1.Line())
         } |
         expr TLshift expr {
-            $$ = &ast.RelationalOpExpr{Lhs: $1, Operator: "<<", Rhs: $3}
+            $$ = &ast.ArithmeticOpExpr{Lhs: $1, Operator: "<<", Rhs: $3}
             $$.SetLine($1.Line())
         } |
         expr T2Comma expr {
