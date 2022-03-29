@@ -136,6 +136,15 @@ var definitions = []string{
 	"local function _(_, ...)\nend;\n",
 }
 
+var bitwise = []string{
+	"_ = _ & _;\n",
+	"_ = _ | _;\n",
+	"_ = _ ~ _;\n",
+	"_ = _ << _;\n",
+	"_ = _ >> _;\n",
+	"_ = ~_;\n",
+}
+
 var tests = map[string][]string{
 	"Assignment": assignment,
 	"Structures":    control,
@@ -150,6 +159,7 @@ var tests = map[string][]string{
 	"Table":       table,
 	"Calls":       calls,
 	"Definitions": definitions,
+	"Bitwise": bitwise,
 }
 
 func TestFormat(t *testing.T) {
