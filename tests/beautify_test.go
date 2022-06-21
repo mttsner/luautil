@@ -145,6 +145,11 @@ var bitwise = []string{
 	"_ = ~_;\n",
 }
 
+var gotolabel = []string{
+	"goto test;\n",
+	"::label::;\n",
+}
+
 var tests = map[string][]string{
 	"Assignment": assignment,
 	"Structures":    control,
@@ -160,6 +165,7 @@ var tests = map[string][]string{
 	"Calls":       calls,
 	"Definitions": definitions,
 	"Bitwise": bitwise,
+	"Goto&Labels": gotolabel,
 }
 
 func TestFormat(t *testing.T) {

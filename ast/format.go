@@ -1,6 +1,7 @@
 package ast
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -372,8 +373,15 @@ func (s *builder) stmt(st Stmt) {
 		s.addln(" do")
 		s.chunk(stmt.Chunk)
 		s.tab().add("end")
+	case *LabelStmt:
+		s.add("::")
+		s.add(stmt.Name)
+		s.add("::")
+	case *GotoStmt:
+		s.add("goto ")
+		s.add(stmt.Label)
 	default:
-		panic("Unimplemented statement")
+		panic(fmt.Sprintf("unexpected statement kind: %T", stmt))
 	}
 	s.add(";\n")
 }
