@@ -63,7 +63,7 @@ func (s *builder) expr(ex Expr, d data) {
 			s.wrap(e.Object, d)
 		}
 
-		if str, ok := e.Key.(*StringExpr); ok && isValid(str.Value) {
+		if str, ok := e.Key.(*StringExpr); ok && isValid(str.Value) && !isReserved(str.Value) {
 			s.add(".")
 			s.add(str.Value)
 		} else {
@@ -79,7 +79,7 @@ func (s *builder) expr(ex Expr, d data) {
 			s.addln("")
 			s.tab()
 			if field.Key != nil {
-				if str, ok := field.Key.(*StringExpr); ok && isValid(str.Value) {
+				if str, ok := field.Key.(*StringExpr); ok && isValid(str.Value) && !isReserved(str.Value){
 					s.add(str.Value)
 				} else {
 					s.add("[")

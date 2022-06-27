@@ -50,6 +50,7 @@ var expressions = []string{
 	"_ = true;\n",
 	"_ = false;\n",
 	"_ = nil;\n",
+	"_ = _[\"and\"];\n",
 }
 
 var arithmetic = []string{
@@ -90,6 +91,7 @@ var table = []string{
 	"_ = {\n\t_,\n\t_\n};\n",
 	"_ = {\n\t_ = {}\n};\n",
 	"_ = {\n\t[_] = {}\n};\n",
+	"_ = {\n\t[\"and\"] = nil\n};\n",
 }
 
 var calls = []string{

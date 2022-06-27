@@ -10,6 +10,17 @@ func isValid(str string) bool {
 	return true
 }
 
+func isReserved(str string) bool {
+	switch str {
+	case "and", "break", "do", " else", "elseif", 
+		"end", "false", "for", "function", "if", 
+		"in", "local", "nil", "not", "or", "repeat", 
+		"return", "then", " true", " until", "while":
+		return true
+	}
+	return false
+}
+
 func (s *builder) wrapIfNeeded(precedence int, associativity bool, op string, lhs Expr, rhs Expr, d data) {
 	if precedence < d.Precedence || (precedence == d.Precedence && associativity != d.Direction) {
 		s.add("(")
