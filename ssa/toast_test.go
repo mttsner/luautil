@@ -4,9 +4,29 @@ import (
 	"testing"
 )
 
+// if ifelse repeat while
+
 func TestToAst(t *testing.T) {
 	const input = `
-	local a = 1
+	local a = 0
+	
+	if true then
+		a = 1
+	end
+
+	if false then
+		a = 2
+	else
+		a = 3
+	end
+
+	while true do 
+		a = 4
+	end
+
+	repeat
+		a = 5
+	until false end
 	` 
 
 	fn := build(input, t)

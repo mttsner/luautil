@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-func (s Nil) String() string { return "nil" }
-func (s True) String() string { return "true" }
-func (s False) String() string { return "false" }
+func (s Nil) String() string    { return "nil" }
+func (s True) String() string   { return "true" }
+func (s False) String() string  { return "false" }
 func (s VarArg) String() string { return "..." }
 
 func (s Number) String() string {
@@ -63,10 +63,14 @@ func (s *Local) String() string {
 	return s.Name()
 }
 
-func (v *Global) String() string { 
-	return v.Comment
+func (v *Global) String() string {
+	switch t := v.Value.(type) {
+	case String:
+		return t.Value
+	default:
+		panic("Unimplemented Global type when printing")
+	}
 }
-
 
 func (s Call) String() string {
 	b := &strings.Builder{}
@@ -91,7 +95,19 @@ func (s Call) String() string {
 	return b.String()
 }
 
-func (s *Return) String() string { return "" }
+func (s *Return) String() string {
+	b := &strings.Builder{}
+
+	b.WriteString("return ")
+	for i, v := range s.Values {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(v.String())
+	}
+
+	return b.String()
+}
 
 func (f *Function) String() string {
 	b := &strings.Builder{}
@@ -118,8 +134,28 @@ func (s *If) String() string {
 	return fmt.Sprintf("if %s goto %d else %d", s.Cond, tblock, fblock)
 }
 
-func (v *Assign) String() string {
-	return fmt.Sprintf("%s = %s", v.Lhs, v.Rhs)
+func (s *Assign) String() string {
+	b := &strings.Builder{}
+
+	for i, v := range s.Lhs {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(v.String())
+	}
+	
+	if len(s.Rhs) == 0 {
+		return b.String()
+	}
+
+	b.WriteString(" = ")
+	for i, v := range s.Rhs {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(v.String())
+	}
+	return b.String()
 }
 
 func (v *CompoundAssign) String() string {
@@ -127,17 +163,26 @@ func (v *CompoundAssign) String() string {
 }
 
 func (v *NumberFor) String() string {
-	return fmt.Sprintf("for %s = %s, %s, %d do", v.Local, v.Init, v.Limit, v.Step)
+	return fmt.Sprintf("for %s = %s, %s, %s do", v.Local, v.Init, v.Limit, v.Step)
 }
 
 func (v *GenericFor) String() string {
 	var b strings.Builder
 	b.WriteString("for ")
-	b.WriteString(fmt.Sprintf("%s", v.Locals[0]))
-	for i := 1; i < len(v.Locals); i++ {
-		b.WriteString(fmt.Sprintf("%s,", v.Locals[0]))
+	for i, l := range v.Locals {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(l.String())
 	}
 	b.WriteString(" in ")
+	for i, v := range v.Values {
+		if i != 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(v.String())
+	}
+	b.WriteString(" do")
 	return b.String()
 }
 

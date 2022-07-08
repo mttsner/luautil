@@ -6,7 +6,7 @@ import (
 	"github.com/notnoobmaster/luautil/ast"
 )
 
-type builder struct {}
+type builder struct{}
 
 func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 	switch ex := expr.(type) {
@@ -134,12 +134,15 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 	body := fn.NewBasicBlock("repeat.body")
 	done := fn.NewBasicBlock("repeat.done") // target of 'break'
 
-	fn.emitJump(body)
-	fn.emitReturn(b.expr(fn, s.Condition), body, done)
+	//fn.emitJump(body)
+	addEdge(fn.currentBlock, body)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
 	fn.emitJump(loop)
+
+	fn.currentBlock = loop
+	fn.emitIf(b.expr(fn, s.Condition), body, done)
 	fn.currentBlock = done
 }
 
@@ -148,7 +151,8 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	body := fn.NewBasicBlock("while.body")
 	done := fn.NewBasicBlock("while.done") // target of 'break'
 
-	fn.emitJump(loop)
+	//fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 
@@ -169,13 +173,20 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	init := b.expr(fn, s.Init)
 	step := b.expr(fn, s.Step)
 
+	fn.breakBlock = done
+	fn.continueBlock = loop
+
 	fn.emitJump(loop)
+	fn.currentBlock = loop
 	fn.emitNumberFor(local, init, limit, step, body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
 	fn.emitJump(loop)
+	
 	fn.currentBlock = done
+	fn.breakBlock = nil
+	fn.continueBlock = nil
 }
 
 func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
@@ -187,19 +198,27 @@ func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	values := make([]Value, len(s.Exprs))
 
 	for i, name := range s.Names {
-		locals[i] = fn.lookup(name)
+		locals[i] = fn.addLocal(name)
 	}
 
 	for i, expr := range s.Exprs {
 		values[i] = b.expr(fn, expr)
 	}
 
+	fn.breakBlock = done
+	fn.continueBlock = loop
+
 	fn.emitJump(loop)
+	fn.currentBlock = loop
 	fn.emitGenericFor(locals, values, body, done)
+
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
 	fn.emitJump(loop)
+
 	fn.currentBlock = done
+	fn.breakBlock = nil
+	fn.continueBlock = nil
 }
 
 // chunk emits to fn code for all statements in list.
@@ -213,58 +232,58 @@ func (b *builder) chunk(fn *Function, list ast.Chunk) {
 
 // stmt lowers statement s to SSA form, emitting code to fn.
 func (b *builder) stmt(fn *Function, st ast.Stmt) {
-
 	switch s := st.(type) {
 	case *ast.AssignStmt:
-		if len(s.Lhs) <= len(s.Rhs) { // a, b = 1, 2 or a, b = 1, 2, 3
-			for i, ex := range s.Lhs {
-				fn.EmitAssign(b.expr(fn, ex), b.expr(fn, s.Rhs[i]))
-			}
-		} else { // a, b = 1
-			i, l, r := 0, len(s.Lhs), len(s.Rhs)
-			for ; i < l; i++ {
-				fn.EmitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, s.Rhs[i]))
-			}
-			for ; i < r; i++ {
-				fn.EmitAssign(b.expr(fn, s.Lhs[i]), b.expr(fn, &ast.NilExpr{}))
+		l, r := len(s.Lhs), len(s.Rhs)
+		lhs, rhs := make([]Value, l), []Value{}
+
+		for i, l := range s.Lhs {
+			lhs[i] = b.expr(fn, l)
+			if i >= r {
+				rhs = append(rhs, Nil{})
+			} else {
+				rhs = append(rhs, b.expr(fn, s.Rhs[i]))
 			}
 		}
+
+		fn.EmitMultiAssign(lhs, rhs)
 	case *ast.CompoundAssignStmt:
-		if len(s.Lhs) <= len(s.Rhs) { // a, b = 1, 2 or a, b = 1, 2, 3
-			for i, ex := range s.Lhs {
-				fn.emitCompoundAssign(s.Operator, b.expr(fn, ex), b.expr(fn, s.Rhs[i]))
-			}
-		} else { // a, b = 1
-			i, l, r := 0, len(s.Lhs), len(s.Rhs)
-			for ; i < l; i++ {
-				fn.emitCompoundAssign(s.Operator, b.expr(fn, s.Lhs[i]), b.expr(fn, s.Rhs[i]))
-			}
-			for ; i < r; i++ {
-				fn.emitCompoundAssign(s.Operator, b.expr(fn, s.Lhs[i]), b.expr(fn, &ast.NilExpr{}))
+		l, r := len(s.Lhs), len(s.Rhs)
+		lhs, rhs := make([]Value, l), []Value{}
+
+		for i, l := range s.Lhs {
+			lhs[i] = b.expr(fn, l)
+			if i >= r {
+				rhs = append(rhs, Nil{})
+			} else {
+				rhs = append(rhs, b.expr(fn, s.Rhs[i]))
 			}
 		}
+
+		fn.emitCompoundAssign(s.Operator, lhs, rhs)
 	case *ast.LocalAssignStmt:
-		switch {
-		case len(s.Names) <= len(s.Exprs): // local a, b = 1, 2
-			for i, name := range s.Names {
-				fn.emitLocalAssign(name, b.expr(fn, s.Exprs[i]))
-			}
-		case len(s.Exprs) == 0: // local a, b
+		n, e := len(s.Names), len(s.Exprs)
+		// Locals defined in the beginning of a function without a value are ignored and set to nil.
+		if len(fn.Blocks) == 1 && len(fn.Blocks[0].Instrs) == 0 && e == 0 {
 			for _, name := range s.Names {
-				fn.emitLocalAssign(name, b.expr(fn, &ast.NilExpr{}))
+				fn.addLocal(name)
 			}
-		default: // local a, b = 1
-			i, e, n := 0, len(s.Exprs), len(s.Names)
-			for ; i < e; i++ {
-				fn.emitLocalAssign(s.Names[i], b.expr(fn, s.Exprs[i]))
-			}
-			for ; i < n; i++ {
-				fn.emitLocalAssign(s.Names[i], b.expr(fn, &ast.NilExpr{}))
+			break
+		}
+
+		values := []Value{}
+
+		for i := 0; i < e; i++ {
+			if i >= n {
+				values = append(values, Nil{})
+			} else {
+				values = append(values, b.expr(fn, s.Exprs[i]))
 			}
 		}
+		fn.emitLocalAssign(s.Names, values)
 	case *ast.FuncCallStmt:
 		call := b.funcCallExpr(fn, s.Expr.(*ast.FuncCallExpr))
-		fn.emit(&call)
+		fn.Emit(&call)
 	case *ast.DoBlockStmt:
 		b.chunk(fn, s.Chunk)
 	case *ast.WhileStmt:
@@ -274,7 +293,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	case *ast.LocalFunctionStmt:
 		f := fn.addFunction(s.Func)
 		f.Name = s.Name
-		fn.emitLocalAssign(s.Name, f)
+		fn.emitLocalAssign([]string{s.Name}, []Value{f})
 		b.buildFunction(f)
 	case *ast.FunctionStmt:
 		var lhs Value
@@ -295,10 +314,14 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		b.buildFunction(f)
 		fn.EmitAssign(lhs, f)
 	case *ast.ReturnStmt:
-		// some some trickery to convert the exprs into useable values
-		// something like
-		// exprs(s.Exprs)
-		//fn.emit(&Return{Results: s.Exprs, pos: s.Return})
+		values := make([]Value, len(s.Exprs))
+		for i, expr := range s.Exprs {
+			values[i] = b.expr(fn, expr)
+		}
+
+		fn.Emit(&Return{
+			Values: values,
+		})
 		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.IfStmt:
 		then := fn.NewBasicBlock("if.then")

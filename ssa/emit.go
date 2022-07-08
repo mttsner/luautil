@@ -32,8 +32,8 @@ func (f *Function) emitNumberFor(local, init, limit, step Value, body, done *Bas
 	f.currentBlock = nil
 }
 
-func (f *Function) emitCompoundAssign(op string, lhs Value, rhs Value) {
-	f.emit(&CompoundAssign{
+func (f *Function) emitCompoundAssign(op string, lhs []Value, rhs []Value) {
+	f.Emit(&CompoundAssign{
 		Op:  op,
 		Lhs: lhs,
 		Rhs: rhs,
@@ -41,24 +41,38 @@ func (f *Function) emitCompoundAssign(op string, lhs Value, rhs Value) {
 }
 
 func (f *Function) EmitAssign(lhs Value, rhs Value) {
-	f.emit(&Assign{
+	f.Emit(&Assign{
+		Lhs: []Value{lhs},
+		Rhs: []Value{rhs},
+	})
+}
+
+func (f *Function) EmitMultiAssign(lhs []Value, rhs []Value) {
+	f.Emit(&Assign{
 		Lhs: lhs,
 		Rhs: rhs,
 	})
 }
 
 func (f *Function) emitReturn(cond Value, body *BasicBlock, done *BasicBlock) {
-	f.emit(&Return{})
+	f.Emit(&Return{})
 }
 
-func (f *Function) emitLocalAssign(name string, value Value) {
-	local := f.addLocal(name)
-	f.EmitAssign(local, value)
+func (f *Function) emitLocalAssign(names []string, values []Value) {
+	assign := &Assign{
+		Lhs: make([]Value, len(names)), 
+		Rhs: values,
+	}
+	
+	for i, name := range names {
+		assign.Lhs[i] = f.addLocal(name)
+	}
+	f.Emit(assign)
 }
 
 func (f *Function) emitJump(target *BasicBlock) {
 	b := f.currentBlock
-	b.emit(new(Jump))
+	// from to
 	addEdge(b, target)
 	f.currentBlock = nil
 }

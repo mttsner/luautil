@@ -18,18 +18,20 @@ func build(str string, t *testing.T) *Function {
 
 func TestClosure(t *testing.T) {
 	const input = `
-	local t1,t2 = "a","b"
-	local function t3()
-		print(t3)
+	local t0 = 0
+	local t1 = 1
+	local t2 = 2
+	for t3, t4 in t0, t0, t0 do
+		t0 = t3
+		break
 	end
-	local t4 = function()
-		print(t2)
-	end
+	t0 = t2
 	`
 	fn := build(input, t)
 	b := &strings.Builder{}
-	WriteFunction(b,fn)
-	t.Error("\n"+b.String())
+	WriteCfgDot(b, fn)
+	WriteFunction(b, fn)
+	t.Error("\n" + b.String())
 }
 
 func TestExpr(t *testing.T) {
@@ -81,4 +83,14 @@ func TestBuild(t *testing.T) {
 	`
 	fn := build(input, t)
 	t.Error(fn.String())
+}
+
+func TestStuff(t *testing.T) {
+	const input = `
+	g:char()
+	`
+	fn := build(input, t)
+	b := &strings.Builder{}
+	WriteFunction(b, fn)
+	t.Error("\n" + b.String())
 }

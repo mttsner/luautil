@@ -14,7 +14,8 @@ type Instruction interface {
 	String() string
 	Parent() *Function
 	Block() *BasicBlock
-	setBlock(*BasicBlock)
+	SetBlock(*BasicBlock)
+	Equal(Instruction) bool
 }
 
 type Node interface {
@@ -38,14 +39,14 @@ type Function struct {
 	UpValues  []*Local
 	Functions []*Function   // nested functions defined inside this one
 	Blocks    []*BasicBlock // basic blocks of the function; nil => external
-	VarArg        bool
-	
+	VarArg    bool
+
 	syntax        *ast.FunctionExpr
 	parent        *Function     // enclosing function if anon; nil if global
 	referrers     []Instruction // referring instructions (iff Parent() != nil)
 	continueBlock *BasicBlock
 	breakBlock    *BasicBlock
-	num int
+	num           int
 
 	// The following fields are set transiently during building,
 	// then cleared.
@@ -99,20 +100,20 @@ type Global struct {
 
 type Assign struct {
 	anInstruction
-	Lhs Value
-	Rhs Value
+	Lhs []Value
+	Rhs []Value
 }
 
 type CompoundAssign struct {
 	anInstruction
 	Op  string
-	Lhs Value
-	Rhs Value
+	Lhs []Value
+	Rhs []Value
 }
 
 type Return struct {
 	anInstruction
-	//TODO
+	Values []Value
 }
 
 type NumberFor struct {
@@ -144,11 +145,11 @@ type Call struct {
 
 // Expressions
 
-type Nil struct {}
+type Nil struct{}
 
-type True struct {}
+type True struct{}
 
-type False struct {}
+type False struct{}
 
 type Number struct {
 	Value float64
@@ -186,6 +187,7 @@ type Unary struct {
 }
 
 type Concat struct {
+	anInstruction
 	Lhs Value
 	Rhs Value
 }
@@ -214,7 +216,7 @@ func (v *Function) Referrers() *[]Instruction {
 
 func (v *anInstruction) Parent() *Function          { return v.block.parent }
 func (v *anInstruction) Block() *BasicBlock         { return v.block }
-func (v *anInstruction) setBlock(block *BasicBlock) { v.block = block }
+func (v *anInstruction) SetBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
 func (v *Phi) Operands(rands []*Value) []*Value {

@@ -22,7 +22,7 @@ func (b *BasicBlock) Parent() *Function { return b.parent }
 // If the instruction defines a Value, it is returned.
 //
 func (b *BasicBlock) emit(i Instruction) Value {
-	i.setBlock(b)
+	i.SetBlock(b)
 	b.Instrs = append(b.Instrs, i)
 	v, _ := i.(Value)
 	return v
@@ -132,7 +132,7 @@ func (f *Function) addLocal(name string) *Local {
 	local := &Local{
 		Comment: name,
 		Value:   Nil{},
-		Num:     len(f.Locals) + 1,
+		Num:     len(f.Locals),
 	}
 	f.Locals = append(f.Locals, local)
 	f.currentScope.names[name] = local
@@ -142,16 +142,17 @@ func (f *Function) addLocal(name string) *Local {
 func (f *Function) addGlobal(name string) *Global {
 	global := &Global{
 		Comment: name,
+		Value:   String{Value: name},
 	}
 	//f.Globals = append(f.Globals, global)
 	return global
 }
 
-func (f *Function) addFunction( syntax *ast.FunctionExpr) *Function {
+func (f *Function) addFunction(syntax *ast.FunctionExpr) *Function {
 	fn := &Function{
 		parent: f,
 		syntax: syntax,
-		num: len(f.Functions) + 1,
+		num:    len(f.Functions) + 1,
 	}
 	f.Functions = append(f.Functions, fn)
 	return fn
@@ -232,8 +233,8 @@ func (f *Function) lookup(name string) Value {
 	return f.currentScope.lookup(name)
 }
 
-// emit emits the specified instruction to function f.
-func (f *Function) emit(instr Instruction) Value {
+// Emit emits the specified instruction to function f.
+func (f *Function) Emit(instr Instruction) Value {
 	return f.currentBlock.emit(instr)
 }
 
@@ -305,4 +306,26 @@ func WriteFunction(b *strings.Builder, f *Function) {
 		}
 	}
 	fmt.Fprintf(b, "end\n")
+}
+
+func WriteCfgDot(b *strings.Builder, f *Function) {
+	//fmt.Fprintln(buf, "//", f)
+	fmt.Fprintln(b, "digraph cfg {")
+	for _, block := range f.Blocks {
+		fmt.Fprintf(b, "\tn%d [label=\"", block.Index)
+		for _, instr := range block.Instrs {
+			if instr == nil {
+				b.WriteString("<deleted>\n")
+				continue
+			}
+			b.WriteString(instr.String())
+			b.WriteString("\\n")
+		}
+		b.WriteString("\",shape=\"rectangle\"];\n")
+		// CFG edges.
+		for _, pred := range block.Preds {
+			fmt.Fprintf(b, "\tn%d -> n%d [style=\"solid\",weight=100];\n", pred.Index, block.Index)
+		}
+	}
+	fmt.Fprintln(b, "}")
 }
