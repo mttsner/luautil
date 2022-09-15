@@ -1,8 +1,8 @@
 package ssa
 
 import (
-	"fmt"
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -22,12 +22,12 @@ func TestBuildDomTree(t *testing.T) {
 	`
 	fn := build(input, t)
 	t.Error(fn.String())
-	
+
 	str := &bytes.Buffer{}
 	str.WriteRune('\n')
 	buildDomTree(fn)
 
-	for b, d := range buildDomFrontier(fn) {
+	for b, d := range BuildDomFrontier(fn) {
 		str.WriteString(fmt.Sprintf("%d: ", b))
 		for _, b2 := range d {
 			str.WriteString(b2.String() + ", ")

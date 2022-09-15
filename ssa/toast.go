@@ -64,50 +64,64 @@ func expr(v Value) ast.Expr {
 		panic("unimplemented" + fmt.Sprint(v))
 	}
 }
-func (b *BasicBlock) stmt(dom domFrontier) (chunk ast.Chunk) {
+
+func (f *Function) stmt(i Instruction) ast.Stmt {
+	switch i := i.(type) {
+	case *If:
+		tFront := f.DomFrontier[i.Block().Succs[0].Index]
+		fFront := f.DomFrontier[i.Block().Succs[1].Index]
+		switch {
+		case len(i.Block().Preds) > 1 && i.Block().Dominates(i.Block().Preds[1]):
+			return &ast.WhileStmt{
+				Condition: expr(i.Cond),
+				Chunk:     f.chunk(i.Block().Succs[0]),
+			}
+		case len(tFront) == len(fFront) && tFront[0].Index == fFront[0].Index:
+			return &ast.IfStmt{
+				Condition: expr(i.Cond),
+				Then:      f.chunk(i.Block().Succs[0]),
+				Else:      f.chunk(i.Block().Succs[1]),
+			}
+		default:
+			return &ast.IfStmt{
+				Condition: expr(i.Cond),
+				Then:      f.chunk(i.Block().Succs[0]),
+			}
+		}
+	default:
+		panic("unimplemented")
+	}
+}
+
+func (f *Function) chunk(b *BasicBlock) (chunk ast.Chunk) {
+	for _, inst := range b.Instrs {
+		chunk = append(chunk, f.stmt(inst))
+	}
+	return append(chunk, chunk(next_block))
+}
+
+func (c converter) stmt(b *BasicBlock, dom DomFrontier) (chunk ast.Chunk) {
 	for _, inst := range b.Instrs {
 		switch i := inst.(type) {
 		case *Assign:
 			/*
-			if l, ok := i.Lhs.(*Local); ok && !l.declared {
-				chunk = append(chunk, &ast.LocalAssignStmt{
-					Names: []string{l.Comment},
-					Exprs: []ast.Expr{expr(i.Rhs)},
-				})
-				l.declared = true
-			} else {
-				chunk = append(chunk, &ast.AssignStmt{
-					Lhs: []ast.Expr{expr(i.Lhs)},
-					Rhs: []ast.Expr{expr(i.Rhs)},
-				})
-			}
+				if l, ok := i.Lhs.(*Local); ok && !l.declared {
+					chunk = append(chunk, &ast.LocalAssignStmt{
+						Names: []string{l.Comment},
+						Exprs: []ast.Expr{expr(i.Rhs)},
+					})
+					l.declared = true
+				} else {
+					chunk = append(chunk, &ast.AssignStmt{
+						Lhs: []ast.Expr{expr(i.Lhs)},
+						Rhs: []ast.Expr{expr(i.Rhs)},
+					})
+				}
 			*/
 		case *If:
 			// TODO: Add repeat support
 			// I have no idea how how I wrote this code but it works
-			tFront := dom[b.Succs[0].Index]
-			fFront := dom[b.Succs[1].Index]
-			switch {
-			case len(b.Preds) > 1 && b.Dominates(b.Preds[1]):
-				chunk = append(chunk, &ast.WhileStmt{
-					Condition: expr(i.Cond),
-					Chunk:      b.Succs[0].stmt(dom),
-				})
-				return append(chunk, b.Succs[1].stmt(dom)...)
-			case len(tFront) == len(fFront) && tFront[0].Index == fFront[0].Index:
-				chunk = append(chunk, &ast.IfStmt{
-					Condition: expr(i.Cond),
-					Then:      b.Succs[0].stmt(dom),
-					Else:      b.Succs[1].stmt(dom),
-				})
-				return append(chunk, tFront[0].stmt(dom)...)
-			default:
-				chunk = append(chunk, &ast.IfStmt{
-					Condition: expr(i.Cond),
-					Then:      b.Succs[0].stmt(dom),
-				})
-				return append(chunk, tFront[0].stmt(dom)...)
-			}
+
 		case *Jump:
 			return
 		default:
@@ -122,10 +136,12 @@ func (b *BasicBlock) stmt(dom domFrontier) (chunk ast.Chunk) {
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
 	buildDomTree(f)
-	dom := buildDomFrontier(f)
-	root := f.Blocks[0]
+	BuildDomFrontier(f)
+	return f.chunk(f.Blocks[0])
+}
 
-	return root.stmt(dom)
+type converter struct {
+	*ast.Chunk
 }
 
 /*

@@ -5,10 +5,8 @@ import (
 )
 
 // if ifelse repeat while
-
-func TestToAst(t *testing.T) {
-	const input = `
-	local a = 0
+/*
+local a = 0
 	
 	if true then
 		a = 1
@@ -27,6 +25,15 @@ func TestToAst(t *testing.T) {
 	repeat
 		a = 5
 	until false end
+*/
+
+func TestToAst(t *testing.T) {
+	const input = `
+	local t0 = 0
+	
+	if true then
+		t0 = 1
+	end
 	` 
 
 	fn := build(input, t)

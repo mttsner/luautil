@@ -41,6 +41,8 @@ type Function struct {
 	Blocks    []*BasicBlock // basic blocks of the function; nil => external
 	VarArg    bool
 
+	DomFrontier 
+
 	syntax        *ast.FunctionExpr
 	parent        *Function     // enclosing function if anon; nil if global
 	referrers     []Instruction // referring instructions (iff Parent() != nil)

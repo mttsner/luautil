@@ -1,4 +1,4 @@
-package ssa 
+package ssa
 
 // domFrontier maps each block to the set of blocks in its dominance
 // frontier.  The outer slice is conceptually a map keyed by
@@ -9,14 +9,14 @@ package ssa
 // length, so their receivers needn't be pointers.
 //
 
-type domFrontier [][]*BasicBlock
+type DomFrontier [][]*BasicBlock
 
-func (df domFrontier) add(u, v *BasicBlock) {
+func (df DomFrontier) add(u, v *BasicBlock) {
 	p := &df[u.Index]
 	*p = append(*p, v)
 }
 
-func (df domFrontier) build(u *BasicBlock) {
+func (df DomFrontier) build(u *BasicBlock) {
 	for _, child := range u.dom.children {
 		df.build(child)
 	}
@@ -34,8 +34,7 @@ func (df domFrontier) build(u *BasicBlock) {
 	}
 }
 
-func buildDomFrontier(fn *Function) domFrontier {
-	df := make(domFrontier, len(fn.Blocks))
-	df.build(fn.Blocks[0])
-	return df
+func BuildDomFrontier(fn *Function) {
+	fn.DomFrontier = make(DomFrontier, len(fn.Blocks))
+	fn.DomFrontier.build(fn.Blocks[0])
 }
