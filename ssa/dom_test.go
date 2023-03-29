@@ -26,8 +26,9 @@ func TestBuildDomTree(t *testing.T) {
 	str := &bytes.Buffer{}
 	str.WriteRune('\n')
 	buildDomTree(fn)
+	BuildDomFrontier(fn)
 
-	for b, d := range BuildDomFrontier(fn) {
+	for b, d := range fn.DomFrontier {
 		str.WriteString(fmt.Sprintf("%d: ", b))
 		for _, b2 := range d {
 			str.WriteString(b2.String() + ", ")

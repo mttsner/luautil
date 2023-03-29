@@ -31,14 +31,13 @@ func TestToAst(t *testing.T) {
 	const input = `
 	local t0 = 0
 	
-	if true then
+	repeat
 		t0 = 1
-	end
+	until true end
 	` 
 
 	fn := build(input, t)
 	t.Error(fn.String())
 
-	chunk := fn.Chunk()
-	t.Error("\n" + chunk.String())
+	fn.Chunk()
 }

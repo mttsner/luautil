@@ -65,102 +65,34 @@ func expr(v Value) ast.Expr {
 	}
 }
 
-func (f *Function) stmt(i Instruction) ast.Stmt {
-	switch i := i.(type) {
-	case *If:
-		tFront := f.DomFrontier[i.Block().Succs[0].Index]
-		fFront := f.DomFrontier[i.Block().Succs[1].Index]
-		switch {
-		case len(i.Block().Preds) > 1 && i.Block().Dominates(i.Block().Preds[1]):
-			return &ast.WhileStmt{
-				Condition: expr(i.Cond),
-				Chunk:     f.chunk(i.Block().Succs[0]),
-			}
-		case len(tFront) == len(fFront) && tFront[0].Index == fFront[0].Index:
-			return &ast.IfStmt{
-				Condition: expr(i.Cond),
-				Then:      f.chunk(i.Block().Succs[0]),
-				Else:      f.chunk(i.Block().Succs[1]),
-			}
-		default:
-			return &ast.IfStmt{
-				Condition: expr(i.Cond),
-				Then:      f.chunk(i.Block().Succs[0]),
-			}
-		}
-	default:
-		panic("unimplemented")
+func (f *Function) block(b *BasicBlock, dom DomFrontier) {
+	if len(b.Preds) == 2 && b.Dominates(b.Preds[1]) && len(b.Succs) == 1 {
+		panic("repeat until")
+	}
+
+	if len(b.Succs) != 2 {
+		return 
+	}
+	tFront := dom[b.Succs[0].Index]
+	fFront := dom[b.Succs[1].Index]
+
+	if tFront[0] == b.Succs[1] {
+		panic("if-then")
+	}
+
+	if len(tFront) == len(fFront) && tFront[0].Index == fFront[0].Index {
+		panic("if-else")
+	}
+
+	if len(b.Preds) > 1 && b.Dominates(b.Preds[1]) {
+		panic("while")
 	}
 }
 
-func (f *Function) chunk(b *BasicBlock) (chunk ast.Chunk) {
-	for _, inst := range b.Instrs {
-		chunk = append(chunk, f.stmt(inst))
-	}
-	return append(chunk, chunk(next_block))
-}
-
-func (c converter) stmt(b *BasicBlock, dom DomFrontier) (chunk ast.Chunk) {
-	for _, inst := range b.Instrs {
-		switch i := inst.(type) {
-		case *Assign:
-			/*
-				if l, ok := i.Lhs.(*Local); ok && !l.declared {
-					chunk = append(chunk, &ast.LocalAssignStmt{
-						Names: []string{l.Comment},
-						Exprs: []ast.Expr{expr(i.Rhs)},
-					})
-					l.declared = true
-				} else {
-					chunk = append(chunk, &ast.AssignStmt{
-						Lhs: []ast.Expr{expr(i.Lhs)},
-						Rhs: []ast.Expr{expr(i.Rhs)},
-					})
-				}
-			*/
-		case *If:
-			// TODO: Add repeat support
-			// I have no idea how how I wrote this code but it works
-
-		case *Jump:
-			return
-		default:
-			panic("reached")
-		}
-	}
-	if len(b.Succs) > 0 {
-		return append(chunk, b.Succs[0].stmt(dom)...)
-	}
-	return
-}
-
-func (f *Function) Chunk() (chunk ast.Chunk) {
+func (f *Function) Chunk() {
 	buildDomTree(f)
 	BuildDomFrontier(f)
-	return f.chunk(f.Blocks[0])
+	for _, b := range f.Blocks {
+		f.block(b, f.DomFrontier)
+	}
 }
-
-type converter struct {
-	*ast.Chunk
-}
-
-/*
-if cond then
-	...
-end
-
-if cond then
-	...
-else
-	...
-end
-
-while cond do
-	...
-end
-
-repeat
-	...
-until cond end
-
-*/
