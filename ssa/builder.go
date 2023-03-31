@@ -151,15 +151,20 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	body := fn.NewBasicBlock("while.body")
 	done := fn.NewBasicBlock("while.done") // target of 'break'
 
-	//fn.emitJump(loop)
-	addEdge(fn.currentBlock, loop)
+	fn.breakBlock = done
+	fn.continueBlock = loop
+
+	fn.emitJump(loop)
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
 	fn.emitJump(loop)
+
 	fn.currentBlock = done
+	fn.breakBlock = nil
+	fn.continueBlock = nil
 }
 
 func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {

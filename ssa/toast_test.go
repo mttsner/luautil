@@ -1,13 +1,14 @@
 package ssa
 
 import (
+	"strings"
 	"testing"
 )
 
 // if ifelse repeat while
 /*
 local a = 0
-	
+
 	if true then
 		a = 1
 	end
@@ -18,7 +19,7 @@ local a = 0
 		a = 3
 	end
 
-	while true do 
+	while true do
 		a = 4
 	end
 
@@ -31,12 +32,17 @@ func TestToAst(t *testing.T) {
 	const input = `
 	local t0 = 0
 	
-	repeat
+	for i=1,2,3 do
 		t0 = 1
-	until true end
+		--break
+	end
+	t0 = 2
 	` 
 
 	fn := build(input, t)
+	b := &strings.Builder{}
+	WriteCfgDot(b, fn)
+	t.Log(b.String())
 	t.Error(fn.String())
 
 	fn.Chunk()
