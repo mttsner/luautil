@@ -57,10 +57,7 @@ func (i Call) Equal(instr Instruction) bool {
 
 func (i Return) Equal(instr Instruction) bool {
 	_, success := instr.(*Return)
-	if !success {
-		return false
-	}
-	return true
+	return success
 }
 
 func (i If) Equal(instr Instruction) bool {
@@ -81,10 +78,7 @@ func (i CompoundAssign) Equal(instr Instruction) bool {
 
 func (s Concat) Equal(instr Instruction) bool {
 	_, success := instr.(*Assign)
-	if !success {
-		return false
-	}
-	return true
+	return success
 }
 
 func (s Assign) Equal(instr Instruction) bool {

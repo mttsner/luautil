@@ -20,7 +20,6 @@ func (b *BasicBlock) Parent() *Function { return b.parent }
 
 // emit appends an instruction to the current basic block.
 // If the instruction defines a Value, it is returned.
-//
 func (b *BasicBlock) emit(i Instruction) Value {
 	i.SetBlock(b)
 	b.Instrs = append(b.Instrs, i)
@@ -57,7 +56,6 @@ func (b *BasicBlock) phis() []Instruction {
 
 // replacePred replaces all occurrences of p in b's predecessor list with q.
 // Ordinarily there should be at most one.
-//
 func (b *BasicBlock) replacePred(p, q *BasicBlock) {
 	for i, pred := range b.Preds {
 		if pred == p {
@@ -68,7 +66,6 @@ func (b *BasicBlock) replacePred(p, q *BasicBlock) {
 
 // replaceSucc replaces all occurrences of p in b's successor list with q.
 // Ordinarily there should be at most one.
-//
 func (b *BasicBlock) replaceSucc(p, q *BasicBlock) {
 	for i, succ := range b.Succs {
 		if succ == p {
@@ -80,7 +77,6 @@ func (b *BasicBlock) replaceSucc(p, q *BasicBlock) {
 // removePred removes all occurrences of p in b's
 // predecessor list and φ-nodes.
 // Ordinarily there should be at most one.
-//
 func (b *BasicBlock) removePred(p *BasicBlock) {
 	phis := b.phis()
 
@@ -114,7 +110,6 @@ func (b *BasicBlock) removePred(p *BasicBlock) {
 // Destinations associated with a labelled block.
 // We populate these as labels are encountered in forward gotos or
 // labelled statements.
-//
 type lblock struct {
 	_goto     *BasicBlock
 	_break    *BasicBlock
@@ -123,7 +118,6 @@ type lblock struct {
 
 // addParam adds a (non-escaping) parameter to f.Params of the
 // specified name, type and source position.
-//
 func (f *Function) addParam(name string) {
 	f.Params = append(f.Params, f.addLocal(name))
 }
@@ -160,7 +154,6 @@ func (f *Function) addFunction(syntax *ast.FunctionExpr) *Function {
 
 // StartBody initializes the function prior to generating SSA code for its body.
 // Precondition: f.Type() already set.
-//
 func (f *Function) StartBody() {
 	f.currentBlock = f.NewBasicBlock("entry")
 }
@@ -202,7 +195,6 @@ func (f *Function) finishBody() {
 
 // removeNilBlocks eliminates nils from f.Blocks and updates each
 // BasicBlock.Index.  Use this after any pass that may delete blocks.
-//
 func (f *Function) removeNilBlocks() {
 	j := 0
 	for _, b := range f.Blocks {
@@ -241,7 +233,6 @@ func (f *Function) Emit(instr Instruction) Value {
 // NewBasicBlock adds to f a new basic block and returns it.  It does
 // not automatically become the current block for subsequent calls to emit.
 // comment is an optional string for more readable debugging output.
-//
 func (f *Function) NewBasicBlock(comment string) *BasicBlock {
 	b := &BasicBlock{
 		Index:   len(f.Blocks),
@@ -251,6 +242,20 @@ func (f *Function) NewBasicBlock(comment string) *BasicBlock {
 	b.Succs = b.succs2[:0]
 	f.Blocks = append(f.Blocks, b)
 	return b
+}
+
+func (f *Function) createBasicBlock(comment string) *BasicBlock {
+	b := &BasicBlock{
+		Comment: comment,
+		parent:  f,
+	}
+	b.Succs = b.succs2[:0]
+	return b
+}
+
+func (f *Function) addBasicBlock(b *BasicBlock) {
+	b.Index = len(f.Blocks)
+	f.Blocks = append(f.Blocks, b)
 }
 
 func (f *Function) Syntax() *ast.FunctionExpr { return f.syntax }

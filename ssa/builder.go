@@ -329,24 +329,32 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		})
 		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.IfStmt:
+		base := fn.currentBlock
+		fn.Emit(&If{Cond: b.expr(fn, s.Condition)})
+		
 		then := fn.NewBasicBlock("if.then")
-		done := fn.NewBasicBlock("if.done")
-		els := done
-		if s.Else != nil {
-			els = fn.NewBasicBlock("if.else")
-		}
-
-		fn.emitIf(b.expr(fn, s.Condition), then, els) //TODO: convert to jmp stuff like while is
 		fn.currentBlock = then
 		b.chunk(fn, s.Then)
-		fn.emitJump(done)
+		addEdge(base, then)
+		then = fn.currentBlock	
 
 		if s.Else != nil {
+			els := fn.NewBasicBlock("if.else")
 			fn.currentBlock = els
 			b.chunk(fn, s.Else)
-			fn.emitJump(done)
+			addEdge(base, els)
+			els = fn.currentBlock	
+
+			done := fn.NewBasicBlock("if.done")
+			addEdge(then, done)
+			addEdge(els, done)
+			fn.currentBlock	= done
+		} else {
+			done := fn.NewBasicBlock("if.done")
+			addEdge(then, done)
+			addEdge(base, done)
+			fn.currentBlock	= done
 		}
-		fn.currentBlock = done
 	case *ast.BreakStmt:
 		fn.emitJump(fn.breakBlock)
 		fn.currentBlock = fn.NewBasicBlock("unreachable")
