@@ -65,6 +65,13 @@ func expr(v Value) ast.Expr {
 	}
 }
 
+func exprs(vals []Value) (exprs []ast.Expr) {
+	for _, v := range vals {
+		exprs = append(exprs, expr(v))
+	}
+	return
+}
+
 func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 	for _, instr := range instrs {
 		switch i := instr.(type) {
@@ -81,10 +88,21 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 					Rhs: []ast.Expr{expr(i.Rhs[0])},
 				})
 			}
+		case *Return:
+			chunk = append(chunk, &ast.ReturnStmt{
+				Exprs: exprs(i.Values),
+			})
+		case *Call:
+			chunk = append(chunk, &ast.FuncCallStmt{
+				Expr: &ast.FuncCallExpr{
+					Func:      expr(i.Func),
+					Receiver:  expr(i.Recv),
+					Method:    i.Method,
+					Args:      exprs(i.Args),
+				},
+			})
 		case *If:
-			panic("should never reach this")
-		case *Jump:
-
+			// do nothing
 		}
 	}
 	return
@@ -130,16 +148,26 @@ func (c *converter) block(b *BasicBlock) {
 		c.addStmt(stmt)
 		c.newScope(c.domFrontier[b.Succs[0].Index][0].Index, &stmt.Else)
 		c.newScope(b.Succs[1].Index, &stmt.Then)
-	/*
-		case b.isWhileLoop():
-			stmt := b.Instrs[len(b.Instrs)-1].(*If)
-			chunk = append(fn.stmts(b.Instrs[:len(b.Instrs)-1]), &ast.WhileStmt{
-				Condition: expr(stmt.Cond),
-				Chunk:      fn.block(b.Succs[0]),
-			})
-			return append(chunk, fn.block(b.Succs[1])...)
-		case b.isRepeat():
-			panic("repeat until")*/
+	case b.isWhileLoop():
+		inst := b.Instrs[len(b.Instrs)-1].(*If)
+		chunk := c.stmts(b.Instrs[:len(b.Instrs)-1])
+		stmt := &ast.WhileStmt{
+			Condition: expr(inst.Cond),
+			Chunk:     ast.Chunk{},
+		}
+		c.addChunk(chunk)
+		c.addStmt(stmt)
+		c.newScope(b.Succs[1].Index, &stmt.Chunk)
+	case b.isRepeat():
+		inst := b.Preds[1].Instrs[0].(*If)
+		chunk := c.stmts(b.Instrs)
+		stmt := &ast.RepeatStmt{
+			Condition: expr(inst.Cond),
+			Chunk: ast.Chunk{},
+		}
+		c.addStmt(stmt)
+		c.newScope(b.Preds[1].Index, &stmt.Chunk)
+		c.addChunk(chunk)
 	default:
 		c.addChunk(c.stmts(b.Instrs))
 	}
@@ -165,6 +193,7 @@ func (c *converter) newScope(idx int, newScope *ast.Chunk) {
 }
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
+	// need to optimize the ssa for buildDomFrontier to work
 	buildDomTree(f)
 	BuildDomFrontier(f)
 	c := converter{

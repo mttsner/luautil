@@ -24,5 +24,5 @@ func (b *BasicBlock) isRepeat() bool {
 }
 
 func (b *BasicBlock) isWhileLoop() bool {
-	return len(b.Preds) > 1 && b.Dominates(b.Preds[1])
+	return len(b.Preds) > 1 && b.Dominates(b.Preds[1]) && len(b.Succs) == 2
 }

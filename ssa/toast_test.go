@@ -32,13 +32,8 @@ func TestToAst(t *testing.T) {
 	const input = `
 	local t0 = 0
 	
-	if t0 then
-		t0 = 3
-		if t0 then
-			t0 = 1
-		else
-			t0 = 4
-		end
+	for i=1,2,3 do 
+		t0 = 1
 	end
 	t0 = 2
 	` 
