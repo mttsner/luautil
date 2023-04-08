@@ -73,6 +73,7 @@ func (f *Function) emitLocalAssign(names []string, values []Value) {
 func (f *Function) emitJump(target *BasicBlock) {
 	b := f.currentBlock
 	// from to
+	b.emit(new(Jump))
 	addEdge(b, target)
 	f.currentBlock = nil
 }

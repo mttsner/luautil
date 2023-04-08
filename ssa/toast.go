@@ -95,14 +95,14 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 		case *Call:
 			chunk = append(chunk, &ast.FuncCallStmt{
 				Expr: &ast.FuncCallExpr{
-					Func:      expr(i.Func),
-					Receiver:  expr(i.Recv),
-					Method:    i.Method,
-					Args:      exprs(i.Args),
+					Func:     expr(i.Func),
+					Receiver: expr(i.Recv),
+					Method:   i.Method,
+					Args:     exprs(i.Args),
 				},
 			})
-		case *If:
-			// do nothing
+		case *If, *Jump:
+			panic("shouldn't reach controlflow related instructions")
 		}
 	}
 	return
@@ -124,89 +124,129 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 		}
 	}
 */
-func (c *converter) block(b *BasicBlock) {
+func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 	switch {
-	case b.isIf(c.domFrontier):
-		inst := b.Instrs[len(b.Instrs)-1].(*If)
-		chunk := c.stmts(b.Instrs[:len(b.Instrs)-1])
-		stmt := &ast.IfStmt{
-			Condition: expr(inst.Cond),
-			Then:      ast.Chunk{},
-		}
-		c.addChunk(chunk)
-		c.addStmt(stmt)
-		c.newScope(b.Succs[1].Index, &stmt.Then)
-	case b.isIfElse(c.domFrontier):
-		inst := b.Instrs[len(b.Instrs)-1].(*If)
-		chunk := c.stmts(b.Instrs[:len(b.Instrs)-1])
-		stmt := &ast.IfStmt{
-			Condition: expr(inst.Cond),
-			Then:      ast.Chunk{},
-			Else:      ast.Chunk{},
-		}
-		c.addChunk(chunk)
-		c.addStmt(stmt)
-		c.newScope(c.domFrontier[b.Succs[0].Index][0].Index, &stmt.Else)
-		c.newScope(b.Succs[1].Index, &stmt.Then)
 	case b.isWhileLoop():
-		inst := b.Instrs[len(b.Instrs)-1].(*If)
-		chunk := c.stmts(b.Instrs[:len(b.Instrs)-1])
-		stmt := &ast.WhileStmt{
-			Condition: expr(inst.Cond),
-			Chunk:     ast.Chunk{},
+		loop := b // target of 'continue'
+		body := b.Succs[0]
+		done := b.Succs[1] // target of 'break'
+
+		c.fn.breakBlock	= done
+		c.fn.continueBlock = loop
+		
+		instr := loop.Instrs[0].(*If)
+		return ast.Chunk{&ast.WhileStmt{
+			Condition: expr(instr.Cond),
+			Chunk: c.chunk(frame{
+				start: body.Index,
+				end:   done.Index,
+			}),
+		}}
+	case b.isIfElse(c.domFrontier):
+		lastI := len(b.Instrs) - 1
+		instr := b.Instrs[lastI].(*If)
+		stmts := c.stmts(b.Instrs[:lastI])
+		stmt := &ast.IfStmt{
+			Condition: expr(instr.Cond),
+			Then: c.chunk(frame{
+				start: b.Index,
+				end:   b.Succs[1].Index,
+			}),
+			Else: c.chunk(frame{
+				start: b.Succs[1].Index,
+				end:   c.domFrontier[b.Succs[0].Index][0].Index,
+			}),
 		}
-		c.addChunk(chunk)
-		c.addStmt(stmt)
-		c.newScope(b.Succs[1].Index, &stmt.Chunk)
-	case b.isRepeat():
-		inst := b.Preds[1].Instrs[0].(*If)
-		chunk := c.stmts(b.Instrs)
-		stmt := &ast.RepeatStmt{
-			Condition: expr(inst.Cond),
-			Chunk: ast.Chunk{},
+		return append(stmts, stmt)
+	case !ignoreRepeat && b.isRepeat():
+			loop := b.Preds[1] // target of 'continue'
+			done := loop.Succs[1] // target of 'break'
+	
+			c.fn.breakBlock	= done
+			c.fn.continueBlock = loop
+	
+			instr := b.Preds[1].Instrs[0].(*If)
+			stmts := c.block(b, true)
+			stmt := &ast.RepeatStmt{
+				Condition: expr(instr.Cond),
+				Chunk: append(stmts, c.chunk(frame{
+					start: b.Index,
+					end:   loop.Index,
+				})...),
+			}
+			c.skipBlock() // skip if stmt
+			return ast.Chunk{stmt}
+	case b.isIf(c.domFrontier):
+		lastI := len(b.Instrs) - 1
+		instr := b.Instrs[lastI].(*If)
+		stmts := c.stmts(b.Instrs[:lastI])
+		stmt := &ast.IfStmt{
+			Condition: expr(instr.Cond),
+			Then: c.chunk(frame{
+				start: b.Index,
+				end:   b.Succs[1].Index,
+			}),
 		}
-		c.addStmt(stmt)
-		c.newScope(b.Preds[1].Index, &stmt.Chunk)
-		c.addChunk(chunk)
+		return append(stmts, stmt)
+	case b.isGoto():
+		lastI := len(b.Instrs) - 1
+		stmts := c.stmts(b.Instrs[:lastI])
+
+		if c.fn.breakBlock != nil && b.Succs[0].Index == c.fn.breakBlock.Index { // Break
+			return append(stmts, &ast.BreakStmt{})
+		}
+		return append(stmts, &ast.GotoStmt{})
 	default:
-		c.addChunk(c.stmts(b.Instrs))
+		return c.stmts(b.Instrs)
 	}
 }
 
 type converter struct {
 	domFrontier  DomFrontier
-	currentScope *ast.Chunk
-	scopes       map[int]*ast.Chunk
+	currentFrame frame
+	fn           *Function
+	idx          int
 }
 
-func (c *converter) addChunk(chunk ast.Chunk) {
-	(*c.currentScope) = append((*c.currentScope), chunk...)
+type frame struct {
+	start, end int
 }
 
-func (c *converter) addStmt(stmt ast.Stmt) {
-	(*c.currentScope) = append((*c.currentScope), stmt)
+func (f frame) size() int {
+	return f.end - f.start
 }
 
-func (c *converter) newScope(idx int, newScope *ast.Chunk) {
-	c.scopes[idx] = c.currentScope
-	c.currentScope = newScope
+func (c *converter) nextBlock(f frame) *BasicBlock {
+	if f.start <= c.idx && c.idx < f.end {
+		c.idx++
+		return c.fn.Blocks[c.idx-1]
+	}
+	return nil
+}
+
+func (c *converter) skipBlock() {
+	c.idx++
+}
+
+func (c *converter) chunk(f frame) ast.Chunk {
+	chunk := make(ast.Chunk, 0, f.size()*10)
+	for b := c.nextBlock(f); b != nil; b = c.nextBlock(f) {
+		chunk = append(chunk, c.block(b, false)...)
+	}
+	return chunk
 }
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
 	// need to optimize the ssa for buildDomFrontier to work
+	deleteUnreachableBlocks(f)
 	buildDomTree(f)
 	BuildDomFrontier(f)
 	c := converter{
-		currentScope: &chunk,
-		scopes:       map[int]*ast.Chunk{},
-		domFrontier:  f.DomFrontier,
+		domFrontier: f.DomFrontier,
+		fn:          f,
 	}
-
-	for _, b := range f.Blocks {
-		if scope, ok := c.scopes[b.Index]; ok {
-			c.currentScope = scope
-		}
-		c.block(b)
-	}
-	return
+	return c.chunk(frame{
+		start: c.idx,
+		end:   len(f.Blocks),
+	})
 }

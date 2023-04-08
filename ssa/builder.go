@@ -134,16 +134,21 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 	body := fn.NewBasicBlock("repeat.body")
 	done := fn.createBasicBlock("repeat.done") // target of 'break'
 
-	//fn.emitJump(body)
+	fn.breakBlock = done
+	fn.continueBlock = loop
+
 	addEdge(fn.currentBlock, body)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 	fn.currentBlock = done
+	fn.breakBlock = nil
+	fn.continueBlock = nil
+
 	fn.addBasicBlock(loop)
 	fn.addBasicBlock(done)
 }
@@ -156,13 +161,13 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 
 	fn.addBasicBlock(done)
 

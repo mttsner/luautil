@@ -32,9 +32,16 @@ func TestToAst(t *testing.T) {
 	const input = `
 	local t0 = 0
 	
-	for i=1,2,3 do 
+	repeat
 		t0 = 1
-	end
+		if t0 then
+			break
+		end
+		while t0 do
+			break
+		end
+		t0 = 3
+	until t0
 	t0 = 2
 	` 
 
@@ -43,7 +50,9 @@ func TestToAst(t *testing.T) {
 	WriteCfgDot(b, fn)
 	t.Log(b.String())
 	t.Log(fn.String())
-
 	ast := fn.Chunk()
+	WriteCfgDot(b, fn)
+	t.Log(b.String())
+	t.Log(fn.String())
 	t.Error("\n"+ast.String())
 }
