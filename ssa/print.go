@@ -116,12 +116,7 @@ func (f *Function) String() string {
 }
 
 func (s *Jump) String() string {
-	// Be robust against malformed CFG.
-	block := -1
-	if s.block != nil && len(s.block.Succs) == 1 {
-		block = s.block.Succs[0].Index
-	}
-	return fmt.Sprintf("jump %d", block)
+	return fmt.Sprintf("jump %d", s.Target.Index)
 }
 
 func (s *If) String() string {

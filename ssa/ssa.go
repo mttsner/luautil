@@ -79,6 +79,7 @@ type anInstruction struct {
 
 type Jump struct {
 	anInstruction
+	Target *BasicBlock	
 }
 
 type Phi struct {

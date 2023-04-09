@@ -112,7 +112,12 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 					Args:     exprs(i.Args),
 				},
 			})
-		case *If, *Jump, *GenericFor, *NumberFor:
+		case *Jump:
+			if c.fn.breakBlock != nil && i.Target.Index == c.fn.breakBlock.Index { // Break
+				chunk = append(chunk, &ast.BreakStmt{})
+			}
+
+		case *If, *GenericFor, *NumberFor:
 			panic("shouldn't reach controlflow related instructions")
 		}
 	}
@@ -206,7 +211,7 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 			Condition: expr(instr.Cond),
 			Chunk: append(stmts, c.chunk(frame{
 				start: b.Index,
-				end:   loop.Index,
+				end:   done.Index,
 			})...),
 		}
 		c.skipBlock() // skip if stmt
@@ -223,14 +228,6 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 			}),
 		}
 		return append(stmts, stmt)
-	case b.isGoto():
-		lastI := len(b.Instrs) - 1
-		stmts := c.stmts(b.Instrs[:lastI])
-
-		if c.fn.breakBlock != nil && b.Succs[0].Index == c.fn.breakBlock.Index { // Break
-			return append(stmts, &ast.BreakStmt{})
-		}
-		return append(stmts, &ast.GotoStmt{})
 	default:
 		return c.stmts(b.Instrs)
 	}
@@ -238,7 +235,6 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 
 type converter struct {
 	domFrontier  DomFrontier
-	currentFrame frame
 	fn           *Function
 	idx          int
 }
@@ -272,8 +268,6 @@ func (c *converter) chunk(f frame) ast.Chunk {
 }
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
-	// need to optimize the ssa for buildDomFrontier to work
-	deleteUnreachableBlocks(f)
 	buildDomTree(f)
 	BuildDomFrontier(f)
 	c := converter{
