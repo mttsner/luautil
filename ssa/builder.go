@@ -179,7 +179,7 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
 	body := fn.NewBasicBlock("for.body")
-	done := fn.NewBasicBlock("for.done") // target of 'break'
+	done := fn.createBasicBlock("for.done") // target of 'break'
 
 	local := fn.addLocal(s.Name)
 
@@ -190,13 +190,15 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitNumberFor(local, init, limit, step, body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
+
+	fn.addBasicBlock(done)
 	
 	fn.currentBlock = done
 	fn.breakBlock = nil
@@ -206,7 +208,7 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
 	body := fn.NewBasicBlock("for.body")
-	done := fn.NewBasicBlock("for.done") // target of 'break'
+	done := fn.createBasicBlock("for.done") // target of 'break'
 
 	locals := make([]Value, len(s.Names))
 	values := make([]Value, len(s.Exprs))
@@ -222,13 +224,15 @@ func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitGenericFor(locals, values, body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	fn.emitJump(loop)
+	addEdge(fn.currentBlock, loop)
+
+	fn.addBasicBlock(done)
 
 	fn.currentBlock = done
 	fn.breakBlock = nil

@@ -5,48 +5,23 @@ import (
 	"testing"
 )
 
-// if ifelse repeat while
-/*
-local a = 0
-
-	if true then
-		a = 1
-	end
-
-	if false then
-		a = 2
-	else
-		a = 3
-	end
-
-	while true do
-		a = 4
-	end
-
-	repeat
-		a = 5
-	until false end
-*/
-
 func TestToAst(t *testing.T) {
 	const input = `
 	local t0 = 0
-	
-	repeat
+
+	for i,v in pairs(t0) do
 		t0 = 1
 		if t0 then
 			break
 		end
-		while t0 do
-			break
-		end
-		t0 = 3
-	until t0
+	end
+
 	t0 = 2
 	` 
 
 	fn := build(input, t)
 	b := &strings.Builder{}
+	deleteUnreachableBlocks(fn)
 	WriteCfgDot(b, fn)
 	t.Log(b.String())
 	t.Log(fn.String())

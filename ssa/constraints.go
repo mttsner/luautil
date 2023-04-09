@@ -22,15 +22,41 @@ func (b *BasicBlock) isRepeat() bool {
 	return len(b.Preds) == 2 && b.Dominates(b.Preds[1])
 }
 
-func (b *BasicBlock) isWhileLoop() bool {
+func (b *BasicBlock) isWhileLoop(dom DomFrontier) bool {
+	if len(b.Succs) != 2 {
+		return false
+	}
+	bFront := dom[b.Succs[0].Index]
+	done := b.Succs[1]
 	return len(b.Instrs) == 1 &&
-		len(b.Succs) == 2 &&
 		((len(b.Preds) > 1 && b.Dominates(b.Preds[1])) ||
-			len(b.Succs[1].Preds) >= 2)
+			bFront[0].Index == done.Index)
 }
 
 func (b *BasicBlock) isGoto() bool {
 	lastI := len(b.Instrs) - 1
+	if lastI < 0 {
+		return false
+	}
 	_, ok := b.Instrs[lastI].(*Jump)
 	return ok && len(b.Succs) == 1
+}
+
+
+func (b *BasicBlock) isNumberForLoop() bool {
+	lastI := len(b.Instrs) - 1
+	if lastI != 0 {
+		return false
+	}
+	_, ok := b.Instrs[lastI].(*NumberFor)
+	return ok
+}
+
+func (b *BasicBlock) isGenericForLoop() bool {
+	lastI := len(b.Instrs) - 1
+	if lastI != 0 {
+		return false
+	}
+	_, ok := b.Instrs[lastI].(*GenericFor)
+	return ok
 }

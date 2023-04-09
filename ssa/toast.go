@@ -60,6 +60,17 @@ func expr(v Value) ast.Expr {
 			Operator: v.Op,
 			Expr:     expr(v.Value),
 		}
+	case Call:
+		return &ast.FuncCallExpr{
+			Func:     expr(v.Func),
+			Receiver: expr(v.Recv),
+			Method:   v.Method,
+			Args:     exprs(v.Args),
+		}
+	case *Global:
+		return &ast.IdentExpr{Value: v.Comment}
+	case nil:
+		return nil
 	default:
 		panic("unimplemented" + fmt.Sprint(v))
 	}
@@ -101,39 +112,63 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 					Args:     exprs(i.Args),
 				},
 			})
-		case *If, *Jump:
+		case *If, *Jump, *GenericFor, *NumberFor:
 			panic("shouldn't reach controlflow related instructions")
 		}
 	}
 	return
 }
 
-/*
-	func (fn *Function) toWhileLoop(b *BasicBlock) ast.Chunk {
-		switch last := b.Instrs[len(b.Instrs)-1].(type) {
-		case *If:
-			fn.breakBlock = b.Succs[1]
-			return append(fn.stmts(b), &ast.WhileStmt{
-				Condition: expr(last.Cond),
-				Chunk: fn.block(b.Succs[0]),
-			})
-		case *Jump:
-			panic("possible while true do loop")
-		default:
-			panic("can't decompile possible while loop")
-		}
-	}
-*/
 func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 	switch {
-	case b.isWhileLoop():
+	case b.isGenericForLoop():
+		loop := b
+		body := b.Succs[0]
+		done := b.Succs[1]
+
+		c.fn.breakBlock = done
+		c.fn.continueBlock = loop
+
+		instr := loop.Instrs[0].(*GenericFor)
+		names := make([]string, len(instr.Locals))
+		for i, l := range instr.Locals {
+			names[i] = l.String()
+		}
+		return ast.Chunk{&ast.GenericForStmt{
+			Names: names,
+			Exprs: exprs(instr.Values),
+			Chunk: c.chunk(frame{
+				start: body.Index,
+				end:   done.Index,
+			}),
+		}}
+	case b.isNumberForLoop():
+		loop := b
+		body := b.Succs[0]
+		done := b.Succs[1]
+
+		c.fn.breakBlock = done
+		c.fn.continueBlock = loop
+
+		instr := loop.Instrs[0].(*NumberFor)
+		return ast.Chunk{&ast.NumberForStmt{
+			Name:  instr.Local.String(),
+			Init:  expr(instr.Init),
+			Limit: expr(instr.Limit),
+			Step:  expr(instr.Step),
+			Chunk: c.chunk(frame{
+				start: body.Index,
+				end:   done.Index,
+			}),
+		}}
+	case b.isWhileLoop(c.domFrontier):
 		loop := b // target of 'continue'
 		body := b.Succs[0]
 		done := b.Succs[1] // target of 'break'
 
-		c.fn.breakBlock	= done
+		c.fn.breakBlock = done
 		c.fn.continueBlock = loop
-		
+
 		instr := loop.Instrs[0].(*If)
 		return ast.Chunk{&ast.WhileStmt{
 			Condition: expr(instr.Cond),
@@ -159,23 +194,23 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 		}
 		return append(stmts, stmt)
 	case !ignoreRepeat && b.isRepeat():
-			loop := b.Preds[1] // target of 'continue'
-			done := loop.Succs[1] // target of 'break'
-	
-			c.fn.breakBlock	= done
-			c.fn.continueBlock = loop
-	
-			instr := b.Preds[1].Instrs[0].(*If)
-			stmts := c.block(b, true)
-			stmt := &ast.RepeatStmt{
-				Condition: expr(instr.Cond),
-				Chunk: append(stmts, c.chunk(frame{
-					start: b.Index,
-					end:   loop.Index,
-				})...),
-			}
-			c.skipBlock() // skip if stmt
-			return ast.Chunk{stmt}
+		loop := b.Preds[1]    // target of 'continue'
+		done := loop.Succs[1] // target of 'break'
+
+		c.fn.breakBlock = done
+		c.fn.continueBlock = loop
+
+		instr := b.Preds[1].Instrs[0].(*If)
+		stmts := c.block(b, true)
+		stmt := &ast.RepeatStmt{
+			Condition: expr(instr.Cond),
+			Chunk: append(stmts, c.chunk(frame{
+				start: b.Index,
+				end:   loop.Index,
+			})...),
+		}
+		c.skipBlock() // skip if stmt
+		return ast.Chunk{stmt}
 	case b.isIf(c.domFrontier):
 		lastI := len(b.Instrs) - 1
 		instr := b.Instrs[lastI].(*If)
