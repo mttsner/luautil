@@ -7,10 +7,12 @@ import (
 
 func TestToAst(t *testing.T) {
 	const input = `
-	local t0 = 0
+	local t0, t1 = 0, 1
 
-	for i,v in pairs(t0) do
-		break
+	if t1 == t1 then 
+		t0 = t1 
+	else
+		t1 = t0 
 	end
 	` 
 

@@ -371,6 +371,9 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 			els = fn.currentBlock	
 
 			done := fn.NewBasicBlock("if.done")
+			fn.currentBlock	= then
+			fn.emitJump(done)
+			
 			addEdge(then, done)
 			addEdge(els, done)
 			fn.currentBlock	= done

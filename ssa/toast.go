@@ -88,15 +88,22 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 		switch i := instr.(type) {
 		case *Assign:
 			if l, ok := i.Lhs[0].(*Local); ok && !l.declared {
+				names := make([]string, len(i.Lhs))
+				for i, l := range i.Lhs {
+					if l, ok := l.(*Local); ok && !l.declared {
+						names[i] = l.String()
+						l.declared = true
+					}
+				}
 				chunk = append(chunk, &ast.LocalAssignStmt{
-					Names: []string{l.Comment},
-					Exprs: []ast.Expr{expr(i.Rhs[0])},
+					Names: names,
+					Exprs: exprs(i.Rhs),
 				})
 				l.declared = true
 			} else {
 				chunk = append(chunk, &ast.AssignStmt{
-					Lhs: []ast.Expr{expr(i.Lhs[0])},
-					Rhs: []ast.Expr{expr(i.Rhs[0])},
+					Lhs: exprs(i.Lhs),
+					Rhs: exprs(i.Rhs),
 				})
 			}
 		case *Return:
@@ -116,7 +123,6 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 			if c.fn.breakBlock != nil && i.Target.Index == c.fn.breakBlock.Index { // Break
 				chunk = append(chunk, &ast.BreakStmt{})
 			}
-
 		case *If, *GenericFor, *NumberFor:
 			panic("shouldn't reach controlflow related instructions")
 		}
