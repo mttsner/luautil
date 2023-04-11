@@ -60,10 +60,10 @@ func (f *Function) emitReturn(cond Value, body *BasicBlock, done *BasicBlock) {
 
 func (f *Function) emitLocalAssign(names []string, values []Value) {
 	assign := &Assign{
-		Lhs: make([]Value, len(names)), 
+		Lhs: make([]Value, len(names)),
 		Rhs: values,
 	}
-	
+
 	for i, name := range names {
 		assign.Lhs[i] = f.addLocal(name)
 	}

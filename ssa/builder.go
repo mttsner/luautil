@@ -130,9 +130,9 @@ func Build(chunk ast.Chunk) *Function {
 
 // repeat stmtemits to fn code for the repeat statement s
 func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
-	loop := fn.createBasicBlock("repeat.loop") // target of 'continue'
+	loop := fn.CreateBasicBlock("repeat.loop") // target of 'continue'
 	body := fn.NewBasicBlock("repeat.body")
-	done := fn.createBasicBlock("repeat.done") // target of 'break'
+	done := fn.CreateBasicBlock("repeat.done") // target of 'break'
 
 	breakBlock := fn.breakBlock
 	continueBlock := fn.continueBlock
@@ -150,17 +150,17 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 	fn.currentBlock = done
 
-	fn.breakBlock = breakBlock	
+	fn.breakBlock = breakBlock
 	fn.continueBlock = continueBlock
 
-	fn.addBasicBlock(loop)
-	fn.addBasicBlock(done)
+	fn.AddBasicBlock(loop)
+	fn.AddBasicBlock(done)
 }
 
 func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	loop := fn.NewBasicBlock("while.loop") // target of 'continue'
 	body := fn.NewBasicBlock("while.body")
-	done := fn.createBasicBlock("while.done") // target of 'break'
+	done := fn.CreateBasicBlock("while.done") // target of 'break'
 
 	breakBlock := fn.breakBlock
 	continueBlock := fn.continueBlock
@@ -174,19 +174,19 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	addEdge(fn.currentBlock, loop)
+	fn.emitJump(loop)
 
-	fn.addBasicBlock(done)
+	fn.AddBasicBlock(done)
 
 	fn.currentBlock = done
-	fn.breakBlock = breakBlock	
+	fn.breakBlock = breakBlock
 	fn.continueBlock = continueBlock
 }
 
 func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
 	body := fn.NewBasicBlock("for.body")
-	done := fn.createBasicBlock("for.done") // target of 'break'
+	done := fn.CreateBasicBlock("for.done") // target of 'break'
 
 	local := fn.addLocal(s.Name)
 
@@ -208,17 +208,17 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	b.chunk(fn, s.Chunk)
 	addEdge(fn.currentBlock, loop)
 
-	fn.addBasicBlock(done)
-	
+	fn.AddBasicBlock(done)
+
 	fn.currentBlock = done
-	fn.breakBlock = breakBlock	
+	fn.breakBlock = breakBlock
 	fn.continueBlock = continueBlock
 }
 
 func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	loop := fn.NewBasicBlock("for.loop") // target of 'continue'
 	body := fn.NewBasicBlock("for.body")
-	done := fn.createBasicBlock("for.done") // target of 'break'
+	done := fn.CreateBasicBlock("for.done") // target of 'break'
 
 	locals := make([]Value, len(s.Names))
 	values := make([]Value, len(s.Exprs))
@@ -245,7 +245,7 @@ func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	b.chunk(fn, s.Chunk)
 	addEdge(fn.currentBlock, loop)
 
-	fn.addBasicBlock(done)
+	fn.AddBasicBlock(done)
 
 	fn.currentBlock = done
 	fn.breakBlock = breakBlock
@@ -356,38 +356,38 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	case *ast.IfStmt:
 		base := fn.currentBlock
 		fn.Emit(&If{Cond: b.expr(fn, s.Condition)})
-		
+
 		then := fn.NewBasicBlock("if.then")
 		fn.currentBlock = then
 		b.chunk(fn, s.Then)
 		addEdge(base, then)
-		then = fn.currentBlock	
+		then = fn.currentBlock
 
 		if s.Else != nil {
 			els := fn.NewBasicBlock("if.else")
 			fn.currentBlock = els
 			b.chunk(fn, s.Else)
 			addEdge(base, els)
-			els = fn.currentBlock	
+			els = fn.currentBlock
 
 			done := fn.NewBasicBlock("if.done")
-			fn.currentBlock	= then
+			fn.currentBlock = then
 			fn.emitJump(done)
-			
+
 			addEdge(then, done)
 			addEdge(els, done)
-			fn.currentBlock	= done
+			fn.currentBlock = done
 		} else {
 			done := fn.NewBasicBlock("if.done")
 			addEdge(then, done)
 			addEdge(base, done)
-			fn.currentBlock	= done
+			fn.currentBlock = done
 		}
 	case *ast.BreakStmt:
 		block := fn.NewBasicBlock("unreachable")
 		addUnreachableEdge(fn.currentBlock, block)
 		fn.emitJump(fn.breakBlock)
-		fn.currentBlock = block	
+		fn.currentBlock = block
 
 	case *ast.ContinueStmt:
 		fn.emitJump(fn.continueBlock)

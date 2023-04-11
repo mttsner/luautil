@@ -250,7 +250,7 @@ func (f *Function) NewBasicBlock(comment string) *BasicBlock {
 	return b
 }
 
-func (f *Function) createBasicBlock(comment string) *BasicBlock {
+func (f *Function) CreateBasicBlock(comment string) *BasicBlock {
 	b := &BasicBlock{
 		Comment: comment,
 		parent:  f,
@@ -259,7 +259,7 @@ func (f *Function) createBasicBlock(comment string) *BasicBlock {
 	return b
 }
 
-func (f *Function) addBasicBlock(b *BasicBlock) {
+func (f *Function) AddBasicBlock(b *BasicBlock) {
 	b.Index = len(f.Blocks)
 	f.Blocks = append(f.Blocks, b)
 }
