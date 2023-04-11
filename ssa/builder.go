@@ -385,7 +385,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		}
 	case *ast.BreakStmt:
 		block := fn.NewBasicBlock("unreachable")
-		addUnreachableEdge(fn.currentBlock, block)
+		AddUnreachableEdge(fn.currentBlock, block)
 		fn.emitJump(fn.breakBlock)
 		fn.currentBlock = block
 

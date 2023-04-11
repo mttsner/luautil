@@ -9,7 +9,7 @@ import (
 	"github.com/notnoobmaster/luautil/ast"
 )
 
-func addUnreachableEdge(from, to *BasicBlock) {
+func AddUnreachableEdge(from, to *BasicBlock) {
 	from.unSuccs = append(from.unSuccs, to)
 	to.unPreds = append(to.unPreds, from)
 }
