@@ -8,8 +8,9 @@ package ssa
 
 func markReachable(b *BasicBlock) {
 	b.reachable = true
+	b.unPreds = nil
 	for _, succ := range b.Succs {
-		if succ.reachable == false {
+		if !succ.reachable {
 			markReachable(succ)
 		}
 	}
@@ -18,9 +19,9 @@ func markReachable(b *BasicBlock) {
 func markUnreachableBlocks(f *Function) {
 	markReachable(f.Blocks[0])
 	for _, b := range f.Blocks {
-		if b.reachable == false {
+		if !b.reachable {
 			for _, c := range b.Succs {
-				if c.reachable == true {
+				if c.reachable {
 					c.removePred(b) // delete reachable->unreachable edge
 				}
 			}
