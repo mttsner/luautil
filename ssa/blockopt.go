@@ -6,37 +6,26 @@ package ssa
 
 // Simple block optimizations to simplify the control flow graph.
 
-// markReachable sets Index=-1 for all blocks reachable from b.
 func markReachable(b *BasicBlock) {
-	b.Index = -1
+	b.reachable = true
 	for _, succ := range b.Succs {
-		if succ.Index == 0 {
+		if succ.reachable == false {
 			markReachable(succ)
 		}
 	}
 }
 
-// deleteUnreachableBlocks marks all reachable blocks of f and
-// eliminates (nils) all others, including possibly cyclic subgraphs.
-func deleteUnreachableBlocks(f *Function) {
-	const white, black = 0, -1
-	// We borrow b.Index temporarily as the mark bit.
-	for _, b := range f.Blocks {
-		b.Index = white
-	}
+func markUnreachableBlocks(f *Function) {
 	markReachable(f.Blocks[0])
-	for i, b := range f.Blocks {
-		if b.Index == white {
+	for _, b := range f.Blocks {
+		if b.reachable == false {
 			for _, c := range b.Succs {
-				if c.Index == black {
-					c.removePred(b) // delete white->black edge
+				if c.reachable == true {
+					c.removePred(b) // delete reachable->unreachable edge
 				}
 			}
-
-			f.Blocks[i] = nil // delete b
 		}
 	}
-	f.removeNilBlocks()
 }
 
 // jumpThreading attempts to apply simple jump-threading to block b,
@@ -119,7 +108,6 @@ func fuseBlocks(f *Function, a *BasicBlock) bool {
 // completed function: dead block elimination, block fusion, jump
 // threading.
 func optimizeBlocks(f *Function) {
-	deleteUnreachableBlocks(f)
 
 	// Loop until no further progress.
 	changed := true

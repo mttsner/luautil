@@ -9,6 +9,11 @@ import (
 	"github.com/notnoobmaster/luautil/ast"
 )
 
+func addUnreachableEdge(from, to *BasicBlock) {
+	from.unSuccs = append(from.unSuccs, to)
+	to.unPreds = append(to.unPreds, from)
+}
+
 // addEdge adds a control-flow graph edge from from to to.
 func addEdge(from, to *BasicBlock) {
 	from.Succs = append(from.Succs, to)
@@ -95,6 +100,7 @@ func (b *BasicBlock) removePred(p *BasicBlock) {
 	}
 	// Nil out b.Preds[j:] and φ-edges[j:] to aid GC.
 	for i := j; i < len(b.Preds); i++ {
+		b.unPreds = append(b.unPreds, b.Preds[i])
 		b.Preds[i] = nil
 		for _, instr := range phis {
 			instr.(*Phi).Edges[i] = nil
@@ -330,6 +336,10 @@ func WriteCfgDot(b *strings.Builder, f *Function) {
 		// CFG edges.
 		for _, pred := range block.Preds {
 			fmt.Fprintf(b, "\tn%d -> n%d [style=\"solid\",weight=100];\n", pred.Index, block.Index)
+		}
+
+		for _, pred := range block.unPreds {
+			fmt.Fprintf(b, "\tn%d -> n%d [style=\"dotted\",weight=100];\n", pred.Index, block.Index)
 		}
 	}
 	fmt.Fprintln(b, "}")

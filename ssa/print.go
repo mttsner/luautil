@@ -116,7 +116,12 @@ func (f *Function) String() string {
 }
 
 func (s *Jump) String() string {
-	return fmt.Sprintf("jump %d", s.Target.Index)
+	// Be robust against malformed CFG.
+	block := -1
+	if s.block != nil && len(s.block.Succs) == 1 {
+		block = s.block.Succs[0].Index
+	}
+	return fmt.Sprintf("jump %d", block)
 }
 
 func (s *If) String() string {
@@ -138,7 +143,7 @@ func (s *Assign) String() string {
 		}
 		b.WriteString(v.String())
 	}
-	
+
 	if len(s.Rhs) == 0 {
 		return b.String()
 	}
@@ -214,7 +219,6 @@ func (v *Phi) String() string {
 
 // String returns a human-readable label of this block.
 // It is not guaranteed unique within the function.
-//
 func (b *BasicBlock) String() string {
 	return fmt.Sprintf("%d", b.Index)
 }

@@ -119,11 +119,7 @@ func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
 					Args:     exprs(i.Args),
 				},
 			})
-		case *Jump:
-			if c.fn.breakBlock != nil && i.Target.Index == c.fn.breakBlock.Index { // Break
-				chunk = append(chunk, &ast.BreakStmt{})
-			}
-		case *If, *GenericFor, *NumberFor:
+		case *If,*Jump, *GenericFor, *NumberFor:
 			panic("shouldn't reach controlflow related instructions")
 		}
 	}
@@ -234,6 +230,14 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 			}),
 		}
 		return append(stmts, stmt)
+	case b.isGoto():
+		lastI := len(b.Instrs) - 1
+		stmts := c.stmts(b.Instrs[:lastI])
+
+		if c.fn.breakBlock != nil && b.Succs[0].Index == c.fn.breakBlock.Index { // Break
+			return append(stmts, &ast.BreakStmt{})
+		}
+		return append(stmts, &ast.GotoStmt{})
 	default:
 		return c.stmts(b.Instrs)
 	}

@@ -88,6 +88,12 @@ func (lt *ltState) dfs(v *BasicBlock, i int32, preorder []*BasicBlock) int32 {
 			i = lt.dfs(w, i, preorder)
 		}
 	}
+	for _, w := range v.unSuccs {
+		if lt.sdom[w.Index] == nil {
+			lt.parent[w.Index] = v
+			i = lt.dfs(w, i, preorder)
+		}
+	}
 	return i
 }
 
@@ -112,11 +118,12 @@ func (lt *ltState) link(v, w *BasicBlock) {
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
 //
 func buildDomTree(f *Function) {
+	markUnreachableBlocks(f)
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
 	// Clear any previous domInfo.
-	for _, b := range f.Blocks {
+	for _, b := range f.Blocks{
 		b.dom = domInfo{}
 	}
 
@@ -161,7 +168,12 @@ func buildDomTree(f *Function) {
 				lt.sdom[w.Index] = lt.sdom[u.Index]
 			}
 		}
-
+		for _, v := range w.unPreds {
+			u := lt.eval(v)
+			if lt.sdom[u.Index].dom.pre < lt.sdom[w.Index].dom.pre {
+				lt.sdom[w.Index] = lt.sdom[u.Index]
+			}
+		}
 		lt.link(lt.parent[w.Index], w)
 
 		if lt.parent[w.Index] == lt.sdom[w.Index] {

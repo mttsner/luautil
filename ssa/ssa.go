@@ -41,7 +41,7 @@ type Function struct {
 	Blocks    []*BasicBlock // basic blocks of the function; nil => external
 	VarArg    bool
 
-	DomFrontier 
+	DomFrontier
 
 	syntax        *ast.FunctionExpr
 	parent        *Function     // enclosing function if anon; nil if global
@@ -71,6 +71,8 @@ type BasicBlock struct {
 	succs2       [2]*BasicBlock // initial space for Succs
 	gaps         int            // number of nil Instrs (transient)
 	dom          domInfo        // dominator tree info
+	reachable    bool
+	unPreds, unSuccs []*BasicBlock  // unreachable predecessors and successors
 }
 
 type anInstruction struct {
@@ -79,7 +81,6 @@ type anInstruction struct {
 
 type Jump struct {
 	anInstruction
-	Target *BasicBlock	
 }
 
 type Phi struct {
@@ -230,8 +231,8 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 }
 
 // Non-Instruction Values:
-//func (v *Const) Operands(rands []*Value) []*Value    { return rands }
+// func (v *Const) Operands(rands []*Value) []*Value    { return rands }
 func (v *Function) Operands(rands []*Value) []*Value { return rands }
 
-//func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
+// func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
 func (v *Local) Name() string { return fmt.Sprintf("t%d", v.Num) }
