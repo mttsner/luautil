@@ -140,11 +140,11 @@ func (b *builder) repeatStmt(fn *Function, s *ast.RepeatStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	addEdge(fn.currentBlock, body)
+	AddEdge(fn.currentBlock, body)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
@@ -168,7 +168,7 @@ func (b *builder) whileStmt(fn *Function, s *ast.WhileStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitIf(b.expr(fn, s.Condition), body, done)
 
@@ -200,13 +200,13 @@ func (b *builder) numberForStmt(fn *Function, s *ast.NumberForStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitNumberFor(local, init, limit, step, body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 
 	fn.AddBasicBlock(done)
 
@@ -237,13 +237,13 @@ func (b *builder) genericForStmt(fn *Function, s *ast.GenericForStmt) {
 	fn.breakBlock = done
 	fn.continueBlock = loop
 
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 	fn.currentBlock = loop
 	fn.emitGenericFor(locals, values, body, done)
 
 	fn.currentBlock = body
 	b.chunk(fn, s.Chunk)
-	addEdge(fn.currentBlock, loop)
+	AddEdge(fn.currentBlock, loop)
 
 	fn.AddBasicBlock(done)
 
@@ -360,27 +360,27 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		then := fn.NewBasicBlock("if.then")
 		fn.currentBlock = then
 		b.chunk(fn, s.Then)
-		addEdge(base, then)
+		AddEdge(base, then)
 		then = fn.currentBlock
 
 		if s.Else != nil {
 			els := fn.NewBasicBlock("if.else")
 			fn.currentBlock = els
 			b.chunk(fn, s.Else)
-			addEdge(base, els)
+			AddEdge(base, els)
 			els = fn.currentBlock
 
 			done := fn.NewBasicBlock("if.done")
 			fn.currentBlock = then
 			fn.emitJump(done)
 
-			addEdge(then, done)
-			addEdge(els, done)
+			AddEdge(then, done)
+			AddEdge(els, done)
 			fn.currentBlock = done
 		} else {
 			done := fn.NewBasicBlock("if.done")
-			addEdge(then, done)
-			addEdge(base, done)
+			AddEdge(then, done)
+			AddEdge(base, done)
 			fn.currentBlock = done
 		}
 	case *ast.BreakStmt:

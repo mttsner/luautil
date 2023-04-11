@@ -3,8 +3,8 @@ package ssa
 func (f *Function) emitIf(cond Value, tblock, fblock *BasicBlock) {
 	b := f.currentBlock
 	b.emit(&If{Cond: cond})
-	addEdge(b, tblock)
-	addEdge(b, fblock)
+	AddEdge(b, tblock)
+	AddEdge(b, fblock)
 	f.currentBlock = nil
 }
 
@@ -14,8 +14,8 @@ func (f *Function) emitGenericFor(locals, values []Value, body, done *BasicBlock
 		Locals: locals,
 		Values: values,
 	})
-	addEdge(b, body)
-	addEdge(b, done)
+	AddEdge(b, body)
+	AddEdge(b, done)
 	f.currentBlock = nil
 }
 
@@ -27,8 +27,8 @@ func (f *Function) emitNumberFor(local, init, limit, step Value, body, done *Bas
 		Limit: limit,
 		Step:  step,
 	})
-	addEdge(b, body)
-	addEdge(b, done)
+	AddEdge(b, body)
+	AddEdge(b, done)
 	f.currentBlock = nil
 }
 
@@ -74,6 +74,6 @@ func (f *Function) emitJump(target *BasicBlock) {
 	b := f.currentBlock
 	// from to
 	b.emit(new(Jump))
-	addEdge(b, target)
+	AddEdge(b, target)
 	f.currentBlock = nil
 }

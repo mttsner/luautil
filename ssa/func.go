@@ -14,8 +14,8 @@ func AddUnreachableEdge(from, to *BasicBlock) {
 	to.unPreds = append(to.unPreds, from)
 }
 
-// addEdge adds a control-flow graph edge from from to to.
-func addEdge(from, to *BasicBlock) {
+// AddEdge adds a control-flow graph edge from from to to.
+func AddEdge(from, to *BasicBlock) {
 	from.Succs = append(from.Succs, to)
 	to.Preds = append(to.Preds, from)
 }
