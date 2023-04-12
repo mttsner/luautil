@@ -118,12 +118,12 @@ func (lt *ltState) link(v, w *BasicBlock) {
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
 //
 func buildDomTree(f *Function) {
-	markUnreachableBlocks(f)
+	MarkUnreachableBlocks(f)
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
 	// Clear any previous domInfo.
-	for _, b := range f.Blocks{
+	for _, b := range f.Blocks {
 		b.dom = domInfo{}
 	}
 
@@ -141,7 +141,6 @@ func buildDomTree(f *Function) {
 	preorder := space[3*n : 4*n]
 	root := f.Blocks[0]
 	lt.dfs(root, 0, preorder)
-
 
 	buckets := space[4*n : 5*n]
 	copy(buckets, preorder)

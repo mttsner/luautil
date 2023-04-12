@@ -100,7 +100,6 @@ func (b *BasicBlock) removePred(p *BasicBlock) {
 	}
 	// Nil out b.Preds[j:] and φ-edges[j:] to aid GC.
 	for i := j; i < len(b.Preds); i++ {
-		b.unPreds = append(b.unPreds, b.Preds[i])
 		b.Preds[i] = nil
 		for _, instr := range phis {
 			instr.(*Phi).Edges[i] = nil
@@ -323,7 +322,10 @@ func WriteCfgDot(b *strings.Builder, f *Function) {
 	//fmt.Fprintln(buf, "//", f)
 	fmt.Fprintln(b, "digraph cfg {")
 	for _, block := range f.Blocks {
-		fmt.Fprintf(b, "\tn%d [label=\"", block.Index)
+		//[label="{{ 4: | fblock | P:2 S:0 } | t0 = 1}"]
+		pattern := "\tn%d [label=\"{{ %d: | %s | P:%d S:%d } | "
+		fmt.Fprintf(b, pattern, block.Index, block.Index, block.Comment, len(block.Preds), len(block.Succs))
+
 		for _, instr := range block.Instrs {
 			if instr == nil {
 				b.WriteString("<deleted>\n")
@@ -332,7 +334,7 @@ func WriteCfgDot(b *strings.Builder, f *Function) {
 			b.WriteString(instr.String())
 			b.WriteString("\\n")
 		}
-		b.WriteString("\",shape=\"rectangle\"];\n")
+		b.WriteString("}\",shape=\"record\"];\n")
 		// CFG edges.
 		for _, pred := range block.Preds {
 			fmt.Fprintf(b, "\tn%d -> n%d [style=\"solid\",weight=100];\n", pred.Index, block.Index)

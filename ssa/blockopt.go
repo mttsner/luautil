@@ -16,15 +16,20 @@ func markReachable(b *BasicBlock) {
 	}
 }
 
-func markUnreachableBlocks(f *Function) {
+func MarkUnreachableBlocks(f *Function) {
 	markReachable(f.Blocks[0])
-	for _, b := range f.Blocks {
+	for i, b := range f.Blocks {
 		if !b.reachable {
 			for _, c := range b.Succs {
+				c.unPreds = append(c.unPreds, b)
 				if c.reachable {
 					c.removePred(b) // delete reachable->unreachable edge
 				}
 			}
+			b.unPreds = append(b.unPreds, f.Blocks[i-1])
+			b.unSuccs = append(b.unSuccs, b.Succs...)
+			b.succs2 = [2]*BasicBlock{}
+			b.Succs = b.succs2[:0]
 		}
 	}
 }
@@ -114,7 +119,6 @@ func optimizeBlocks(f *Function) {
 	changed := true
 	for changed {
 		changed = false
-
 
 		for _, b := range f.Blocks {
 			// f.Blocks will temporarily contain nils to indicate

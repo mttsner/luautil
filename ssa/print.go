@@ -120,7 +120,10 @@ func (s *Jump) String() string {
 	block := -1
 	if s.block != nil && len(s.block.Succs) == 1 {
 		block = s.block.Succs[0].Index
+	} else if s.block != nil && len(s.block.unSuccs) == 1 {
+		block = s.block.unSuccs[0].Index
 	}
+
 	return fmt.Sprintf("jump %d", block)
 }
 
