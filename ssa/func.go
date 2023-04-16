@@ -4,6 +4,7 @@ package ssa
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/notnoobmaster/luautil/ast"
@@ -318,23 +319,34 @@ func WriteFunction(b *strings.Builder, f *Function) {
 	fmt.Fprintf(b, "end\n")
 }
 
+
+const (
+	backgroundColor = "141414"
+	borderColor = "white"
+	fontColor = "white"
+	nodeFormat = "n%d [label=\"%s\", shape=record, style=filled, color=\"%s\", fontcolor=\"%s\", fillcolor=\"%s\"];\n"
+	labelFormat = "{%d:\\r | %s } | {{ %s | P:%d S:%d } | %s }"
+)
+//n3 [label="",shape="record", style=filled, color=white, fillcolor="#141414", fontcolor=white];
+
 func WriteCfgDot(b *strings.Builder, f *Function) {
-	//fmt.Fprintln(buf, "//", f)
 	fmt.Fprintln(b, "digraph cfg {")
 	for _, block := range f.Blocks {
-		//[label="{{ 4: | fblock | P:2 S:0 } | t0 = 1}"]
-		pattern := "\tn%d [label=\"{{ %d: | %s | P:%d S:%d } | "
-		fmt.Fprintf(b, pattern, block.Index, block.Index, block.Comment, len(block.Preds), len(block.Succs))
+		lineNums := &strings.Builder{}
+		code := &strings.Builder{}
 
-		for _, instr := range block.Instrs {
+		for i, instr := range block.Instrs {
 			if instr == nil {
-				b.WriteString("<deleted>\n")
+				b.WriteString("<deleted>\\l")
 				continue
 			}
-			b.WriteString(instr.String())
-			b.WriteString("\\n")
+			lineNums.WriteString(strconv.Itoa(i))
+			lineNums.WriteString("\\r")
+			code.WriteString(instr.String())
+			code.WriteString("\\l")
 		}
-		b.WriteString("}\",shape=\"record\"];\n")
+		label := fmt.Sprintf(labelFormat, block.Index, lineNums.String(), block.Comment, len(block.Preds), len(block.Succs), code.String())
+		fmt.Fprintf(b, nodeFormat, block.Index, label, borderColor, fontColor, backgroundColor)
 		// CFG edges.
 		for _, pred := range block.Preds {
 			fmt.Fprintf(b, "\tn%d -> n%d [style=\"solid\",weight=100];\n", pred.Index, block.Index)
