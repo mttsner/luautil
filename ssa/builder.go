@@ -349,10 +349,10 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		for i, expr := range s.Exprs {
 			values[i] = b.expr(fn, expr)
 		}
-
 		fn.Emit(&Return{
 			Values: values,
 		})
+		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.IfStmt:
 		base := fn.currentBlock
 		fn.Emit(&If{Cond: b.expr(fn, s.Condition)})
@@ -374,7 +374,6 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 			fn.currentBlock = then
 			fn.emitJump(done)
 
-			AddEdge(then, done)
 			AddEdge(els, done)
 			fn.currentBlock = done
 		} else {

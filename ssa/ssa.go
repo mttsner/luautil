@@ -63,16 +63,16 @@ type Scope struct {
 }
 
 type BasicBlock struct {
-	Index        int            // index of this block within Parent().Blocks
-	Comment      string         // optional label; no semantic significance
-	parent       *Function      // parent function
-	Instrs       []Instruction  // instructions in order
-	Preds, Succs []*BasicBlock  // predecessors and successors
-	succs2       [2]*BasicBlock // initial space for Succs
-	gaps         int            // number of nil Instrs (transient)
-	dom          domInfo        // dominator tree info
-	reachable    bool
-	unPreds, unSuccs []*BasicBlock  // unreachable predecessors and successors
+	Index            int            // index of this block within Parent().Blocks
+	Comment          string         // optional label; no semantic significance
+	parent           *Function      // parent function
+	Instrs           []Instruction  // instructions in order
+	Preds, Succs     []*BasicBlock  // predecessors and successors
+	succs2           [2]*BasicBlock // initial space for Succs
+	gaps             int            // number of nil Instrs (transient)
+	dom              domInfo        // dominator tree info
+	reachable        bool
+	UnPreds, UnSuccs []*BasicBlock // unreachable predecessors and successors
 }
 
 type anInstruction struct {

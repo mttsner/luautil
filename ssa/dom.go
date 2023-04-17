@@ -88,7 +88,7 @@ func (lt *ltState) dfs(v *BasicBlock, i int32, preorder []*BasicBlock) int32 {
 			i = lt.dfs(w, i, preorder)
 		}
 	}
-	for _, w := range v.unSuccs {
+	for _, w := range v.UnSuccs {
 		if lt.sdom[w.Index] == nil {
 			lt.parent[w.Index] = v
 			i = lt.dfs(w, i, preorder)
@@ -167,7 +167,7 @@ func buildDomTree(f *Function) {
 				lt.sdom[w.Index] = lt.sdom[u.Index]
 			}
 		}
-		for _, v := range w.unPreds {
+		for _, v := range w.UnPreds {
 			u := lt.eval(v)
 			if lt.sdom[u.Index].dom.pre < lt.sdom[w.Index].dom.pre {
 				lt.sdom[w.Index] = lt.sdom[u.Index]

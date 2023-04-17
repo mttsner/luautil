@@ -111,7 +111,22 @@ func (s *Return) String() string {
 
 func (f *Function) String() string {
 	b := &strings.Builder{}
-	WriteFunction(b, f)
+	b.WriteString("function ")
+	b.WriteString(f.Name)
+	b.WriteString("()")
+	for i, p := range f.Params {
+		b.WriteString(p.Name())
+		if i < len(f.Params)-1 {
+			b.WriteString(", ")
+		}
+	}
+	if f.VarArg	{
+		if len(f.Params) > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString("...")
+	}
+	b.WriteString(")")
 	return b.String()
 }
 
@@ -120,8 +135,8 @@ func (s *Jump) String() string {
 	block := -1
 	if s.block != nil && len(s.block.Succs) == 1 {
 		block = s.block.Succs[0].Index
-	} else if s.block != nil && len(s.block.unSuccs) == 1 {
-		block = s.block.unSuccs[0].Index
+	} else if s.block != nil && len(s.block.UnSuccs) == 1 {
+		block = s.block.UnSuccs[0].Index
 	}
 
 	return fmt.Sprintf("jump %d", block)

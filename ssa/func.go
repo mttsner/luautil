@@ -11,8 +11,8 @@ import (
 )
 
 func AddUnreachableEdge(from, to *BasicBlock) {
-	from.unSuccs = append(from.unSuccs, to)
-	to.unPreds = append(to.unPreds, from)
+	from.UnSuccs = append(from.UnSuccs, to)
+	to.UnPreds = append(to.UnPreds, from)
 }
 
 // AddEdge adds a control-flow graph edge from from to to.
@@ -319,14 +319,14 @@ func WriteFunction(b *strings.Builder, f *Function) {
 	fmt.Fprintf(b, "end\n")
 }
 
-
 const (
 	backgroundColor = "141414"
-	borderColor = "white"
-	fontColor = "white"
-	nodeFormat = "n%d [label=\"%s\", shape=record, style=filled, color=\"%s\", fontcolor=\"%s\", fillcolor=\"%s\"];\n"
-	labelFormat = "{%d:\\r | %s } | {{ %s | P:%d S:%d } | %s }"
+	borderColor     = "white"
+	fontColor       = "white"
+	nodeFormat      = "n%d [label=\"%s\", shape=record, style=filled, color=\"%s\", fontcolor=\"%s\", fillcolor=\"%s\"];\n"
+	labelFormat     = "{%d:\\r | %s } | {{ %s | P:%d S:%d } | %s }"
 )
+
 //n3 [label="",shape="record", style=filled, color=white, fillcolor="#141414", fontcolor=white];
 
 func WriteCfgDot(b *strings.Builder, f *Function) {
@@ -352,7 +352,7 @@ func WriteCfgDot(b *strings.Builder, f *Function) {
 			fmt.Fprintf(b, "\tn%d -> n%d [style=\"solid\",weight=100];\n", pred.Index, block.Index)
 		}
 
-		for _, pred := range block.unPreds {
+		for _, pred := range block.UnPreds {
 			fmt.Fprintf(b, "\tn%d -> n%d [style=\"dotted\",weight=100];\n", pred.Index, block.Index)
 		}
 	}

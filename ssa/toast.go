@@ -27,8 +27,18 @@ func expr(v Value) ast.Expr {
 			Object: expr(v.Object),
 			Key:    expr(v.Key),
 		}
-	case Table:
-		panic("implement")
+	case *Table:
+		tbl := &ast.TableExpr{}
+		for _, fi := range v.Fields {
+			field := &ast.Field{
+				Value: expr(fi.Value),
+			}
+			if fi.Key != nil {
+				field.Key = expr(fi.Key)
+			}
+			tbl.Fields = append(tbl.Fields, field)
+		}
+		return tbl
 	case Arithmetic:
 		return &ast.ArithmeticOpExpr{
 			Operator: v.Op,
@@ -71,6 +81,18 @@ func expr(v Value) ast.Expr {
 		return &ast.IdentExpr{Value: v.Comment}
 	case nil:
 		return nil
+	case *Function:
+		expr := &ast.FunctionExpr{
+			ParList: &ast.ParList{
+				HasVargs: v.VarArg,
+				Names: make([]string, len(v.Params)),
+			},
+			Chunk: v.Chunk(),
+		}
+		for i, l := range v.Params {
+			expr.ParList.Names[i] = l.String()
+		}
+		return expr
 	default:
 		panic("unimplemented" + fmt.Sprint(v))
 	}
@@ -175,6 +197,10 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 
 		c.fn.breakBlock = done
 		c.fn.continueBlock = loop
+
+		// Remove jump back instruction 
+		lBlock := c.fn.Blocks[done.Index-1]
+		lBlock.Instrs = lBlock.Instrs[:len(lBlock.Instrs)-1]
 
 		instr := loop.Instrs[0].(*If)
 		return ast.Chunk{&ast.WhileStmt{
