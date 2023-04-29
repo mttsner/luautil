@@ -8,7 +8,6 @@ package ssa
 
 func markReachable(b *BasicBlock) {
 	b.reachable = true
-	b.UnPreds = nil
 	for _, succ := range b.Succs {
 		if !succ.reachable {
 			markReachable(succ)
@@ -16,9 +15,23 @@ func markReachable(b *BasicBlock) {
 	}
 }
 
+/*
+	if len(b.Succs) > 0 {
+		for _, succ := range b.UnSuccs {
+			newUnPreds := make([]*BasicBlock, 0, len(b.UnPreds))
+			for _, pred := range succ.UnPreds {
+				if pred != b {
+					newUnPreds = append(newUnPreds, pred)
+				}
+			}
+			succ.UnPreds = newUnPreds
+		}
+	}
+*/
+
 func MarkUnreachableBlocks(f *Function) {
 	markReachable(f.Blocks[0])
-	for _, b := range f.Blocks {
+	for i, b := range f.Blocks {
 		if !b.reachable {
 			for _, c := range b.Succs {
 				c.UnPreds = append(c.UnPreds, b)
@@ -26,6 +39,8 @@ func MarkUnreachableBlocks(f *Function) {
 					c.removePred(b) // delete reachable->unreachable edge
 				}
 			}
+			// fallthrough edge to unreachable block
+			b.UnPreds = append(b.UnPreds, f.Blocks[i-1])
 			//b.UnPreds = append(b.UnPreds, f.Blocks[i-1])
 			b.UnSuccs = append(b.UnSuccs, b.Succs...)
 			b.succs2 = [2]*BasicBlock{}

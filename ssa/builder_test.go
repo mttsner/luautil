@@ -88,10 +88,7 @@ func TestBuild(t *testing.T) {
 func TestStuff(t *testing.T) {
 	const input = `
 	local t0,t1 = 0,1
-	if t1 < t1 then 
-		t0 = t1
-	else 
-		t1 = t0 
+	local function t2() 
 	end
 	`
 	fn := build(input, t)

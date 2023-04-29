@@ -228,7 +228,14 @@ func (s *Scope) lookup(name string) Value {
 }
 
 func (f *Function) lookup(name string) Value {
-	return f.currentScope.lookup(name)
+	if v, ok := f.currentScope.names[name]; ok {
+		return v
+	}
+	v := f.currentScope.lookup(name)
+	if local, ok := v.(*Local); ok {
+		f.UpValues = append(f.UpValues, local)
+	}
+	return v
 }
 
 // Emit emits the specified instruction to function f.
@@ -269,27 +276,32 @@ func (f *Function) Syntax() *ast.FunctionExpr { return f.syntax }
 func WriteFunction(b *strings.Builder, f *Function) {
 	for _, fn := range f.Functions {
 		WriteFunction(b, fn)
+		b.WriteRune('\n')
 	}
 
 	const punchcard = 80
+	header := &strings.Builder{}
 
-	b.WriteString("\nfunction ")
-	b.WriteString(f.Name)
-	b.WriteString("(")
+	header.WriteString("function ")
+	header.WriteString(f.Name)
+	header.WriteString("(")
+
 	for i, arg := range f.Params {
 		if i != 0 {
-			b.WriteString(", ")
+			header.WriteString(", ")
 		}
-		b.WriteString(arg.String())
+		header.WriteString(arg.String())
 	}
 	if f.VarArg {
 		if len(f.Params) > 0 {
-			b.WriteString(", ")
+			header.WriteString(", ")
 		}
-		b.WriteString("...")
+		header.WriteString("...")
 	}
+
+	b.WriteString(header.String())
 	bmsg := fmt.Sprintf("locals:%d upvalues:%d", len(f.Locals), len(f.UpValues))
-	fmt.Fprintf(b, ")%*s%s\n", punchcard-1-len(bmsg)-len(b.String()), "", bmsg)
+	fmt.Fprintf(b, ")%*s%s\n", punchcard-1-len(bmsg)-len(header.String()), "", bmsg)
 
 	for _, block := range f.Blocks {
 		if block == nil {
@@ -327,10 +339,13 @@ const (
 	labelFormat     = "{%d:\\r | %s } | {{ %s | P:%d S:%d } | %s }"
 )
 
-//n3 [label="",shape="record", style=filled, color=white, fillcolor="#141414", fontcolor=white];
-
 func WriteCfgDot(b *strings.Builder, f *Function) {
-	fmt.Fprintln(b, "digraph cfg {")
+	for _, fn := range f.Functions {
+		WriteCfgDot(b, fn)
+		b.WriteRune('\n')
+	}
+
+	fmt.Fprintf(b, "digraph %s {\n", f.Name)
 	for _, block := range f.Blocks {
 		lineNums := &strings.Builder{}
 		code := &strings.Builder{}

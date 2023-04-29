@@ -16,7 +16,7 @@ func (s Number) String() string {
 }
 
 func (s String) String() string {
-	return strconv.Quote(s.Value)
+	return "'"+ s.Value + "'"
 }
 
 func (s Table) String() string {
@@ -113,7 +113,7 @@ func (f *Function) String() string {
 	b := &strings.Builder{}
 	b.WriteString("function ")
 	b.WriteString(f.Name)
-	b.WriteString("()")
+	b.WriteString("(")
 	for i, p := range f.Params {
 		b.WriteString(p.Name())
 		if i < len(f.Params)-1 {

@@ -118,7 +118,6 @@ func (lt *ltState) link(v, w *BasicBlock) {
 // Precondition: all blocks are reachable (e.g. optimizeBlocks has been run).
 //
 func buildDomTree(f *Function) {
-	MarkUnreachableBlocks(f)
 	// The step numbers refer to the original LT paper; the
 	// reordering is due to Georgiadis.
 
@@ -266,6 +265,9 @@ func sanityCheckDomTree(f *Function) {
 			var x big.Int
 			x.Set(&all)
 			for _, pred := range b.Preds {
+				x.And(&x, &D[pred.Index])
+			}
+			for _, pred := range b.UnPreds {
 				x.And(&x, &D[pred.Index])
 			}
 			x.SetBit(&x, i, 1) // a block always dominates itself.

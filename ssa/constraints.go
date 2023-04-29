@@ -15,7 +15,7 @@ func (b *BasicBlock) isIfElse(dom DomFrontier) bool {
 	}
 	tFront := dom[b.Succs[0].Index]
 	fFront := dom[b.Succs[1].Index]
-	return len(tFront) == len(fFront) && tFront[0].Index == fFront[0].Index
+	return len(tFront) == len(fFront) && len(tFront) > 0 && tFront[0].Index == fFront[0].Index
 }
 
 func (b *BasicBlock) isRepeat() bool {
@@ -27,10 +27,12 @@ func (b *BasicBlock) isWhileLoop(dom DomFrontier) bool {
 		return false
 	}
 	bFront := dom[b.Succs[0].Index]
-	done := b.Succs[1]
+	if len(bFront) <= 0 {
+		return false
+	}
+	
 	return len(b.Instrs) == 1 &&
-		((len(b.Preds) > 1 && b.Dominates(b.Preds[1])) ||
-			bFront[0].Index == done.Index)
+		(len(b.Preds) > 1 && b.Dominates(b.Preds[1]))
 }
 
 func (b *BasicBlock) isGoto() bool {

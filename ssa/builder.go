@@ -324,8 +324,26 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	case *ast.LocalFunctionStmt:
 		f := fn.addFunction(s.Func)
 		f.Name = s.Name
-		fn.emitLocalAssign([]string{s.Name}, []Value{f})
-		b.buildFunction(f)
+		local := fn.addLocal(s.Name)
+		fn.Emit(&Assign{
+			Lhs: []Value{local},
+			Rhs: []Value{f},
+		})
+		
+		f.StartBody()
+		syn := f.syntax
+		for _, name := range syn.ParList.Names {
+			f.addParam(name)
+		}
+		f.VarArg = syn.ParList.HasVargs
+		
+		f.currentScope  = &Scope{f, fn.currentScope, make(map[string]Variable)}
+		f.currentScope.names[s.Name] = local
+		for _, s := range syn.Chunk {
+			b.stmt(f, s)
+		}
+		f.UpValues = append(f.UpValues, local)
+		f.finishBody()
 	case *ast.FunctionStmt:
 		var lhs Value
 		f := fn.addFunction(s.Func)

@@ -25,6 +25,11 @@ func (df DomFrontier) build(u *BasicBlock) {
 			df.add(u, vb)
 		}
 	}
+	for _, vb := range u.UnSuccs {
+		if v := vb.dom; v.idom != u {
+			df.add(u, vb)
+		}
+	}
 	for _, w := range u.dom.children {
 		for _, vb := range df[w.Index] {
 			if v := vb.dom; v.idom != u {

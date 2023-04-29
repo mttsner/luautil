@@ -21,7 +21,7 @@ func expr(v Value) ast.Expr {
 	case String:
 		return &ast.StringExpr{Value: v.Value}
 	case *Local:
-		return &ast.IdentExpr{Value: v.Comment}
+		return &ast.IdentExpr{Value: v.Name()}
 	case AttrGet:
 		return &ast.AttrGetExpr{
 			Object: expr(v.Object),
@@ -70,7 +70,7 @@ func expr(v Value) ast.Expr {
 			Operator: v.Op,
 			Expr:     expr(v.Value),
 		}
-	case Call:
+	case *Call:
 		return &ast.FuncCallExpr{
 			Func:     expr(v.Func),
 			Receiver: expr(v.Recv),
@@ -78,14 +78,17 @@ func expr(v Value) ast.Expr {
 			Args:     exprs(v.Args),
 		}
 	case *Global:
-		return &ast.IdentExpr{Value: v.Comment}
+		if v, ok := v.Value.(String); ok {
+			return &ast.IdentExpr{Value: v.Value}
+		}
+		panic("Invalid global")
 	case nil:
 		return nil
 	case *Function:
 		expr := &ast.FunctionExpr{
 			ParList: &ast.ParList{
 				HasVargs: v.VarArg,
-				Names: make([]string, len(v.Params)),
+				Names:    make([]string, len(v.Params)),
 			},
 			Chunk: v.Chunk(),
 		}
@@ -105,45 +108,72 @@ func exprs(vals []Value) (exprs []ast.Expr) {
 	return
 }
 
-func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
-	for _, instr := range instrs {
-		switch i := instr.(type) {
-		case *Assign:
-			if l, ok := i.Lhs[0].(*Local); ok && !l.declared {
-				names := make([]string, len(i.Lhs))
-				for i, l := range i.Lhs {
-					if l, ok := l.(*Local); ok && !l.declared {
-						names[i] = l.String()
-						l.declared = true
+func (c *converter) stmt(instr Instruction) ast.Stmt {
+	switch i := instr.(type) {
+	case *Assign:
+		if len(i.Lhs) == 0 || len(i.Rhs) == 0 {
+			panic("invalid assign instruction")
+		}
+
+		l, okl := i.Lhs[0].(*Local)
+		f, okf := i.Rhs[0].(*Function)
+		// Very funky code
+		switch {
+		case !(okl && !l.declared):
+			return &ast.AssignStmt{
+				Lhs: exprs(i.Lhs),
+				Rhs: exprs(i.Rhs),
+			}
+		case okf &&
+			len(i.Lhs) == 1 && len(i.Rhs) == 1 &&
+			len(f.UpValues) > 0:
+			for _, up := range f.UpValues {
+				if up == l {
+					return &ast.LocalFunctionStmt{
+						Name: l.Name(),
+						Func: expr(f).(*ast.FunctionExpr),
 					}
 				}
-				chunk = append(chunk, &ast.LocalAssignStmt{
-					Names: names,
-					Exprs: exprs(i.Rhs),
-				})
-				l.declared = true
-			} else {
-				chunk = append(chunk, &ast.AssignStmt{
-					Lhs: exprs(i.Lhs),
-					Rhs: exprs(i.Rhs),
-				})
 			}
-		case *Return:
-			chunk = append(chunk, &ast.ReturnStmt{
-				Exprs: exprs(i.Values),
-			})
-		case *Call:
-			chunk = append(chunk, &ast.FuncCallStmt{
-				Expr: &ast.FuncCallExpr{
-					Func:     expr(i.Func),
-					Receiver: expr(i.Recv),
-					Method:   i.Method,
-					Args:     exprs(i.Args),
-				},
-			})
-		case *If,*Jump, *GenericFor, *NumberFor:
-			panic("shouldn't reach controlflow related instructions")
+			fallthrough
+		default:
+			names := make([]string, len(i.Lhs))
+			for i, l := range i.Lhs {
+				if l, ok := l.(*Local); ok && !l.declared {
+					names[i] = l.Name()
+					l.declared = true
+				}
+			}
+			l.declared = true
+
+			return &ast.LocalAssignStmt{
+				Names: names,
+				Exprs: exprs(i.Rhs),
+			}
 		}
+	case *Return:
+		return &ast.ReturnStmt{
+			Exprs: exprs(i.Values),
+		}
+	case *Call:
+		return &ast.FuncCallStmt{
+			Expr: &ast.FuncCallExpr{
+				Func:     expr(i.Func),
+				Receiver: expr(i.Recv),
+				Method:   i.Method,
+				Args:     exprs(i.Args),
+			},
+		}
+	case *If, *Jump, *GenericFor, *NumberFor:
+		panic("shouldn't reach controlflow related instructions")
+	default:
+		panic("unhandled ssa instruction")
+	}
+}
+
+func (c *converter) stmts(instrs []Instruction) (chunk ast.Chunk) {
+	for _, instr := range instrs {
+		chunk = append(chunk, c.stmt(instr))
 	}
 	return
 }
@@ -198,7 +228,7 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 		c.fn.breakBlock = done
 		c.fn.continueBlock = loop
 
-		// Remove jump back instruction 
+		// Remove jump back instruction
 		lBlock := c.fn.Blocks[done.Index-1]
 		lBlock.Instrs = lBlock.Instrs[:len(lBlock.Instrs)-1]
 
@@ -211,18 +241,28 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 			}),
 		}}
 	case b.isIfElse(c.domFrontier):
+		then := b.Succs[0]
+		els := b.Succs[1]
+		done := c.domFrontier[b.Succs[0].Index][0]
+
+
 		lastI := len(b.Instrs) - 1
 		instr := b.Instrs[lastI].(*If)
 		stmts := c.stmts(b.Instrs[:lastI])
+
+		// Remove jump to done instruction
+		lThen := c.fn.Blocks[els.Index-1]
+		lThen.Instrs = lThen.Instrs[:len(lThen.Instrs)-1]
+
 		stmt := &ast.IfStmt{
 			Condition: expr(instr.Cond),
 			Then: c.chunk(frame{
-				start: b.Index,
-				end:   b.Succs[1].Index,
+				start: then.Index,
+				end:   els.Index,
 			}),
 			Else: c.chunk(frame{
-				start: b.Succs[1].Index,
-				end:   c.domFrontier[b.Succs[0].Index][0].Index,
+				start: els.Index,
+				end:   done.Index,
 			}),
 		}
 		return append(stmts, stmt)
@@ -270,9 +310,9 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 }
 
 type converter struct {
-	domFrontier  DomFrontier
-	fn           *Function
-	idx          int
+	domFrontier DomFrontier
+	fn          *Function
+	idx         int
 }
 
 type frame struct {
@@ -295,15 +335,17 @@ func (c *converter) skipBlock() {
 	c.idx++
 }
 
-func (c *converter) chunk(f frame) ast.Chunk {
-	chunk := make(ast.Chunk, 0, f.size()*10)
+func (c *converter) chunk(f frame) (chunk ast.Chunk) {
 	for b := c.nextBlock(f); b != nil; b = c.nextBlock(f) {
 		chunk = append(chunk, c.block(b, false)...)
 	}
-	return chunk
+	return
 }
 
 func (f *Function) Chunk() (chunk ast.Chunk) {
+	if len(f.Blocks) == 0 {
+		return
+	}
 	buildDomTree(f)
 	BuildDomFrontier(f)
 	c := converter{

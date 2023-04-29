@@ -8,8 +8,10 @@ import (
 func TestToAst(t *testing.T) {
 	const input = `
 	local t0, t1 = 0, 1
-	while t0 do t0 = t1 end
-	` 
+	local function t2()
+		t0 = 1
+	end
+	`
 
 	fn := build(input, t)
 	b := &strings.Builder{}

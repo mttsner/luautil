@@ -95,6 +95,7 @@ type Local struct {
 	Num     int
 
 	declared bool
+	upvalue bool
 }
 
 type Global struct {
@@ -235,4 +236,11 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 func (v *Function) Operands(rands []*Value) []*Value { return rands }
 
 // func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
-func (v *Local) Name() string { return fmt.Sprintf("t%d", v.Num) }
+func (v *Local) Name() string { 
+	if v.upvalue {
+		return fmt.Sprintf("u%d", v.Num) 
+	}
+	return fmt.Sprintf("t%d", v.Num) 
+}
+
+func (v *Local) MarkAsUpvalue() { v.upvalue = true}
