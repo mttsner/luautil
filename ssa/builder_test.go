@@ -87,9 +87,8 @@ func TestBuild(t *testing.T) {
 
 func TestStuff(t *testing.T) {
 	const input = `
-	local t0,t1 = 0,1
-	local function t2() 
-	end
+	local x = 2
+	local x = x + 2
 	`
 	fn := build(input, t)
 	b := &strings.Builder{}

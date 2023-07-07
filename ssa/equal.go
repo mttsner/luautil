@@ -82,7 +82,7 @@ func (s Concat) Equal(instr Instruction) bool {
 }
 
 func (s Assign) Equal(instr Instruction) bool {
-	v, success := instr.(*Assign)
+	/*v, success := instr.(*Define)
 	if !success {
 		return false
 	}
@@ -100,9 +100,9 @@ func (s Assign) Equal(instr Instruction) bool {
 			return false
 		}
 	}
+	*/
 	return true
 }
-
 
 func (i Jump) Equal(instr Instruction) bool {
 	panic("Jump: Not Implemented")

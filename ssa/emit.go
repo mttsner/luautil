@@ -40,17 +40,9 @@ func (f *Function) emitCompoundAssign(op string, lhs []Value, rhs []Value) {
 	})
 }
 
-func (f *Function) EmitAssign(lhs Value, rhs Value) {
-	f.Emit(&Assign{
-		Lhs: []Value{lhs},
-		Rhs: []Value{rhs},
-	})
-}
-
-func (f *Function) EmitMultiAssign(lhs []Value, rhs []Value) {
-	f.Emit(&Assign{
-		Lhs: lhs,
-		Rhs: rhs,
+func (f *Function) EmitAssign(locals []*Local) {
+	f.Emit(&Define{
+		Locals: locals,
 	})
 }
 
@@ -59,13 +51,13 @@ func (f *Function) emitReturn(cond Value, body *BasicBlock, done *BasicBlock) {
 }
 
 func (f *Function) emitLocalAssign(names []string, values []Value) {
-	assign := &Assign{
-		Lhs: make([]Value, len(names)),
-		Rhs: values,
+	assign := &Define{
+		Locals: make([]*Local, len(names)),
 	}
 
 	for i, name := range names {
-		assign.Lhs[i] = f.addLocal(name)
+		assign.Locals[i] = f.addLocal(name)
+		assign.Locals[i].Value = values[i]
 	}
 	f.Emit(assign)
 }

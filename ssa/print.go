@@ -16,7 +16,7 @@ func (s Number) String() string {
 }
 
 func (s String) String() string {
-	return "'"+ s.Value + "'"
+	return "'" + s.Value + "'"
 }
 
 func (s Table) String() string {
@@ -120,7 +120,7 @@ func (f *Function) String() string {
 			b.WriteString(", ")
 		}
 	}
-	if f.VarArg	{
+	if f.VarArg {
 		if len(f.Params) > 0 {
 			b.WriteString(", ")
 		}
@@ -154,7 +154,7 @@ func (s *If) String() string {
 
 func (s *Assign) String() string {
 	b := &strings.Builder{}
-
+	/*
 	for i, v := range s.Lhs {
 		if i != 0 {
 			b.WriteString(", ")
@@ -173,6 +173,7 @@ func (s *Assign) String() string {
 		}
 		b.WriteString(v.String())
 	}
+	*/
 	return b.String()
 }
 

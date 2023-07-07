@@ -110,7 +110,7 @@ func exprs(vals []Value) (exprs []ast.Expr) {
 
 func (c *converter) stmt(instr Instruction) ast.Stmt {
 	switch i := instr.(type) {
-	case *Assign:
+	case *Define:
 		if len(i.Lhs) == 0 || len(i.Rhs) == 0 {
 			panic("invalid assign instruction")
 		}
@@ -244,7 +244,6 @@ func (c *converter) block(b *BasicBlock, ignoreRepeat bool) ast.Chunk {
 		then := b.Succs[0]
 		els := b.Succs[1]
 		done := c.domFrontier[b.Succs[0].Index][0]
-
 
 		lastI := len(b.Instrs) - 1
 		instr := b.Instrs[lastI].(*If)

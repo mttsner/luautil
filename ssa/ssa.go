@@ -8,14 +8,16 @@ import (
 
 type Value interface {
 	String() string
+	Referrers() *[]Instruction
 }
 
 type Instruction interface {
-	String() string
+	//String() string
 	Parent() *Function
 	Block() *BasicBlock
 	SetBlock(*BasicBlock)
-	Equal(Instruction) bool
+	Operands(rands []*Value) []*Value
+	//Equal(Instruction) bool
 }
 
 type Node interface {
@@ -95,7 +97,7 @@ type Local struct {
 	Num     int
 
 	declared bool
-	upvalue bool
+	upvalue  bool
 }
 
 type Global struct {
@@ -103,10 +105,17 @@ type Global struct {
 	Value   Value
 }
 
+type Define struct {
+	anInstruction
+	Local *Local
+	index int
+	Comment string
+}
+
 type Assign struct {
 	anInstruction
-	Lhs []Value
-	Rhs []Value
+	Local *Local
+	Value Value
 }
 
 type CompoundAssign struct {
@@ -236,11 +245,11 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 func (v *Function) Operands(rands []*Value) []*Value { return rands }
 
 // func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
-func (v *Local) Name() string { 
+func (v *Local) Name() string {
 	if v.upvalue {
-		return fmt.Sprintf("u%d", v.Num) 
+		return fmt.Sprintf("u%d", v.Num)
 	}
-	return fmt.Sprintf("t%d", v.Num) 
+	return fmt.Sprintf("t%d", v.Num)
 }
 
-func (v *Local) MarkAsUpvalue() { v.upvalue = true}
+func (v *Local) MarkAsUpvalue() { v.upvalue = true }
