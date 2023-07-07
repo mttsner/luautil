@@ -131,8 +131,10 @@ func (f *Function) addParam(name string) {
 func (f *Function) addLocal(name string) *Local {
 	local := &Local{
 		Comment: name,
-		Value:   Nil{},
-		Num:     len(f.Locals),
+		Value:   nil,
+		Index:   len(f.Locals),
+		def: f.currentBlock,
+		parent: f,
 	}
 	f.Locals = append(f.Locals, local)
 	f.currentScope.names[name] = local
@@ -166,14 +168,14 @@ func (f *Function) StartBody() {
 
 func (f *Function) newScope() *Scope {
 	old := f.currentScope
-	f.currentScope = &Scope{f, f.currentScope, make(map[string]Variable)}
+	f.currentScope = &Scope{f, f.currentScope, make(map[string]*Local)}
 	return old
 }
 
 // buildReferrers populates the def/use information in all non-nil
 // Value.Referrers slice.
 // Precondition: all such slices are initially empty.
-/*
+
 func buildReferrers(f *Function) {
 	var rands []*Value
 	for _, b := range f.Blocks {
@@ -189,7 +191,7 @@ func buildReferrers(f *Function) {
 		}
 	}
 }
-*/
+
 // finishBody() finalizes the function after SSA code generation of its body.
 func (f *Function) finishBody() {
 	f.currentBlock = nil
@@ -217,24 +219,22 @@ func (f *Function) removeNilBlocks() {
 	f.Blocks = f.Blocks[:j]
 }
 
-func (s *Scope) lookup(name string) Value {
+func (s *Scope) lookup(name string) *Local {
 	if v, ok := s.names[name]; ok {
 		return v
 	}
 	if s.parent == nil {
-		return s.function.addGlobal(name)
+		return nil
 	}
 	return s.parent.lookup(name)
 }
 
-func (f *Function) lookup(name string) Value {
+func (f *Function) lookup(name string) *Local {
 	if v, ok := f.currentScope.names[name]; ok {
 		return v
 	}
 	v := f.currentScope.lookup(name)
-	if local, ok := v.(*Local); ok {
-		f.UpValues = append(f.UpValues, local)
-	}
+	f.UpValues = append(f.UpValues, v)
 	return v
 }
 

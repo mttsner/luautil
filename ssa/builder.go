@@ -21,7 +21,11 @@ func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 	case *ast.StringExpr:
 		return String{ex.Value}
 	case *ast.IdentExpr:
-		return fn.lookup(ex.Value)
+		v := fn.lookup(ex.Value)
+		if v == nil {
+			return fn.addGlobal(ex.Value)
+		}
+		return v
 	case *ast.Comma3Expr:
 		return VarArg{}
 	case *ast.AttrGetExpr:
@@ -42,28 +46,28 @@ func (b *builder) expr(fn *Function, expr ast.Expr) Value {
 		}
 		return tbl
 	case *ast.ArithmeticOpExpr:
-		return Arithmetic{
+		return fn.emitExpr(Arithmetic{
 			Op: ex.Operator,
 
 			Lhs: b.expr(fn, ex.Lhs),
 			Rhs: b.expr(fn, ex.Rhs),
-		}
+		})
 	case *ast.StringConcatOpExpr:
 		return Concat{
-			Lhs: b.expr(fn, ex.Lhs),
-			Rhs: b.expr(fn, ex.Rhs),
+			Lhs: fn.emitExpr(b.expr(fn, ex.Lhs)),
+			Rhs: fn.emitExpr(b.expr(fn, ex.Rhs)),
 		}
 	case *ast.RelationalOpExpr:
 		return Relation{
 			Op:  ex.Operator,
-			Lhs: b.expr(fn, ex.Lhs),
-			Rhs: b.expr(fn, ex.Rhs),
+			Lhs: fn.emitExpr(b.expr(fn, ex.Lhs)),
+			Rhs: fn.emitExpr(b.expr(fn, ex.Rhs)),
 		}
 	case *ast.LogicalOpExpr:
 		return Logic{
 			Op:  ex.Operator,
-			Lhs: b.expr(fn, ex.Lhs),
-			Rhs: b.expr(fn, ex.Rhs),
+			Lhs: fn.emitExpr(b.expr(fn, ex.Lhs)),
+			Rhs: fn.emitExpr(b.expr(fn, ex.Rhs)),
 		}
 	case *ast.UnaryOpExpr:
 		return Unary{
@@ -83,16 +87,16 @@ func (b *builder) funcCallExpr(fn *Function, ex *ast.FuncCallExpr) Call {
 	call := Call{
 		Args: make([]Value, len(ex.Args)),
 	}
-
-	for i, arg := range ex.Args {
-		call.Args[i] = b.expr(fn, arg)
-	}
-
+	
 	if ex.Func != nil { // hoge.func()
-		call.Func = b.expr(fn, ex.Func)
+		call.Func = fn.emitExpr(b.expr(fn, ex.Func))
 	} else { // hoge:func()
 		call.Recv = b.expr(fn, ex.Receiver)
 		call.Method = ex.Method
+	}
+
+	for i, arg := range ex.Args {
+		call.Args[i] = b.expr(fn, arg)
 	}
 	return call
 }
@@ -261,7 +265,7 @@ func (b *builder) chunk(fn *Function, list ast.Chunk) {
 	fn.currentScope = old
 }
 
-// stmt lowers statement s to SSA form, emitting code to fn.
+// stmt lowers statement st to SSA form, emitting code to fn.
 func (b *builder) stmt(fn *Function, st ast.Stmt) {
 	switch s := st.(type) {
 	case *ast.AssignStmt:
@@ -269,7 +273,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		lhs, rhs := make([]Value, l), []Value{}
 
 		for i, l := range s.Lhs {
-			lhs[i] = b.expr(fn, l)
+			lhs[i] = b.expr(fn, l) // dif expr here
 			if i >= r {
 				rhs = append(rhs, Nil{})
 			} else {
@@ -329,15 +333,15 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 			Lhs: []Value{local},
 			Rhs: []Value{f},
 		})
-		
+
 		f.StartBody()
 		syn := f.syntax
 		for _, name := range syn.ParList.Names {
 			f.addParam(name)
 		}
 		f.VarArg = syn.ParList.HasVargs
-		
-		f.currentScope  = &Scope{f, fn.currentScope, make(map[string]Variable)}
+
+		f.currentScope = &Scope{f, fn.currentScope, make(map[string]*Local)}
 		f.currentScope.names[s.Name] = local
 		for _, s := range syn.Chunk {
 			b.stmt(f, s)
@@ -348,7 +352,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		var lhs Value
 		f := fn.addFunction(s.Func)
 		if s.Name.Func != nil {
-			lhs = b.expr(fn, s.Name.Func)
+			//lhs = b.expr(fn, s.Name.Func)
 			switch e := s.Name.Func.(type) {
 			case *ast.IdentExpr: // function func()
 				f.Name = e.Value
@@ -373,7 +377,7 @@ func (b *builder) stmt(fn *Function, st ast.Stmt) {
 		fn.currentBlock = fn.NewBasicBlock("unreachable")
 	case *ast.IfStmt:
 		base := fn.currentBlock
-		fn.Emit(&If{Cond: b.expr(fn, s.Condition)})
+		fn.Emit(&If{Cond: fn.emitExpr(b.expr(fn, s.Condition))})
 
 		then := fn.NewBasicBlock("if.then")
 		fn.currentBlock = then

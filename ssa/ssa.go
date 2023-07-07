@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-
 	"github.com/notnoobmaster/luautil/ast"
 )
 
@@ -12,7 +10,7 @@ type Value interface {
 }
 
 type Instruction interface {
-	//String() string
+	String() string
 	Parent() *Function
 	Block() *BasicBlock
 	SetBlock(*BasicBlock)
@@ -28,10 +26,6 @@ type Node interface {
 	// Partial methods:
 	Operands(rands []*Value) []*Value // nil for non-Instructions
 	Referrers() *[]Instruction        // nil for non-Values
-}
-
-type Variable interface {
-	String() string
 }
 
 type Function struct {
@@ -61,7 +55,7 @@ type Function struct {
 type Scope struct {
 	function *Function
 	parent   *Scope
-	names    map[string]Variable
+	names    map[string]*Local
 }
 
 type BasicBlock struct {
@@ -94,28 +88,26 @@ type Phi struct {
 type Local struct {
 	Comment string
 	Value   Value
-	Num     int
+	Index   int
+	Name string // Used as the variable name in AST
 
-	declared bool
-	upvalue  bool
+	declared  bool
+	upvalue   bool
+	def *BasicBlock
+	parent *Function
+	referrers []Instruction
 }
 
 type Global struct {
-	Comment string
-	Value   Value
-}
-
-type Define struct {
-	anInstruction
-	Local *Local
-	index int
-	Comment string
+	Comment   string
+	Value     Value
+	referrers []Instruction
 }
 
 type Assign struct {
 	anInstruction
-	Local *Local
-	Value Value
+	Lhs []Value
+	Rhs []Value
 }
 
 type CompoundAssign struct {
@@ -233,6 +225,16 @@ func (v *anInstruction) Block() *BasicBlock         { return v.block }
 func (v *anInstruction) SetBlock(block *BasicBlock) { v.block = block }
 func (v *anInstruction) Referrers() *[]Instruction  { return nil }
 
+// Non-Instruction Values:
+// func (v *Const) Operands(rands []*Value) []*Value    { return rands }
+func (v *Function) Operands(rands []*Value) []*Value { return rands }
+
+func (v *Local) MarkAsUpvalue() { v.upvalue = true }
+// DefBlock returns the basicblock the local was defined in
+func (v *Local) DefBlock() *BasicBlock { return v.def}
+func (v *Local) Parent() *Function { return v.parent }
+
+func (v *Jump) Operands(rands []*Value) []*Value { return rands }
 func (v *Phi) Operands(rands []*Value) []*Value {
 	for i := range v.Edges {
 		rands = append(rands, &v.Edges[i])
@@ -240,16 +242,45 @@ func (v *Phi) Operands(rands []*Value) []*Value {
 	return rands
 }
 
-// Non-Instruction Values:
-// func (v *Const) Operands(rands []*Value) []*Value    { return rands }
-func (v *Function) Operands(rands []*Value) []*Value { return rands }
+func (v Nil) Referrers() *[]Instruction        { return nil }
+func (v True) Referrers() *[]Instruction       { return nil }
+func (v False) Referrers() *[]Instruction      { return nil }
+func (v Number) Referrers() *[]Instruction     { return nil }
+func (v String) Referrers() *[]Instruction     { return nil }
+func (v VarArg) Referrers() *[]Instruction     { return nil }
+func (v Field) Referrers() *[]Instruction      { return nil }
+func (v Table) Referrers() *[]Instruction      { return nil }
+func (v AttrGet) Referrers() *[]Instruction    { return nil }
+func (v Arithmetic) Referrers() *[]Instruction { return nil }
+func (v Unary) Referrers() *[]Instruction      { return nil }
+func (v Concat) Referrers() *[]Instruction     { return nil }
+func (v Relation) Referrers() *[]Instruction   { return nil }
+func (v Logic) Referrers() *[]Instruction      { return nil }
 
-// func (v *Function) Name() string                     { return fmt.Sprintf("func:%d", v.num) }
-func (v *Local) Name() string {
-	if v.upvalue {
-		return fmt.Sprintf("u%d", v.Num)
+func (v *Local) Referrers() *[]Instruction        { return &v.referrers }
+func (v *Local) Operands(rands []*Value) []*Value { return rands }
+
+func (v *Global) Referrers() *[]Instruction        { return &v.referrers }
+func (v *Global) Operands(rands []*Value) []*Value { return rands }
+
+func (v *CompoundAssign) Operands(rands []*Value) []*Value { return rands }
+func (v *Return) Operands(rands []*Value) []*Value         { return rands }
+func (v *NumberFor) Operands(rands []*Value) []*Value      { return rands }
+func (v *GenericFor) Operands(rands []*Value) []*Value     { return rands }
+func (v *If) Operands(rands []*Value) []*Value             { return append(rands, &v.Cond) }
+
+// func (v *Assign) Referrers() *[]Instruction { return &v.Local.referrers }
+func (v *Assign) Operands(rands []*Value) []*Value {
+	for _, l := range v.Lhs{
+		rands = append(rands, &l)
 	}
-	return fmt.Sprintf("t%d", v.Num)
+	return rands
 }
 
-func (v *Local) MarkAsUpvalue() { v.upvalue = true }
+func (v Call) Referrers() *[]Instruction { return nil }
+func (v *Call) Operands(rands []*Value) []*Value {
+	for _, val := range v.Args {
+		rands = append(rands, &val)
+	}
+	return rands
+}

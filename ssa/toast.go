@@ -21,7 +21,7 @@ func expr(v Value) ast.Expr {
 	case String:
 		return &ast.StringExpr{Value: v.Value}
 	case *Local:
-		return &ast.IdentExpr{Value: v.Name()}
+		return &ast.IdentExpr{Value: v.Name}
 	case AttrGet:
 		return &ast.AttrGetExpr{
 			Object: expr(v.Object),
@@ -110,11 +110,7 @@ func exprs(vals []Value) (exprs []ast.Expr) {
 
 func (c *converter) stmt(instr Instruction) ast.Stmt {
 	switch i := instr.(type) {
-	case *Define:
-		if len(i.Lhs) == 0 || len(i.Rhs) == 0 {
-			panic("invalid assign instruction")
-		}
-
+	case *Assign:
 		l, okl := i.Lhs[0].(*Local)
 		f, okf := i.Rhs[0].(*Function)
 		// Very funky code
@@ -130,7 +126,7 @@ func (c *converter) stmt(instr Instruction) ast.Stmt {
 			for _, up := range f.UpValues {
 				if up == l {
 					return &ast.LocalFunctionStmt{
-						Name: l.Name(),
+						Name: l.Name,
 						Func: expr(f).(*ast.FunctionExpr),
 					}
 				}
@@ -140,7 +136,7 @@ func (c *converter) stmt(instr Instruction) ast.Stmt {
 			names := make([]string, len(i.Lhs))
 			for i, l := range i.Lhs {
 				if l, ok := l.(*Local); ok && !l.declared {
-					names[i] = l.Name()
+					names[i] = l.Name
 					l.declared = true
 				}
 			}
@@ -341,6 +337,12 @@ func (c *converter) chunk(f frame) (chunk ast.Chunk) {
 	return
 }
 
+func (c *converter) nameLocals() {
+	for _, l := range c.fn.Locals {
+		// check if l's value is a phi node
+		// all edges of a phi node must be named the same
+	}
+}
 func (f *Function) Chunk() (chunk ast.Chunk) {
 	if len(f.Blocks) == 0 {
 		return
@@ -351,6 +353,7 @@ func (f *Function) Chunk() (chunk ast.Chunk) {
 		domFrontier: f.DomFrontier,
 		fn:          f,
 	}
+	c.nameLocals()
 	return c.chunk(frame{
 		start: c.idx,
 		end:   len(f.Blocks),

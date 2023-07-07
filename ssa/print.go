@@ -60,7 +60,7 @@ func (s Logic) String() string {
 }
 
 func (s *Local) String() string {
-	return s.Name()
+	return fmt.Sprintf("t%d", s.Index)
 }
 
 func (v *Global) String() string {
@@ -115,7 +115,7 @@ func (f *Function) String() string {
 	b.WriteString(f.Name)
 	b.WriteString("(")
 	for i, p := range f.Params {
-		b.WriteString(p.Name())
+		b.WriteString(fmt.Sprintf("t%d", p.Index))
 		if i < len(f.Params)-1 {
 			b.WriteString(", ")
 		}
@@ -154,7 +154,7 @@ func (s *If) String() string {
 
 func (s *Assign) String() string {
 	b := &strings.Builder{}
-	/*
+	
 	for i, v := range s.Lhs {
 		if i != 0 {
 			b.WriteString(", ")
@@ -173,7 +173,7 @@ func (s *Assign) String() string {
 		}
 		b.WriteString(v.String())
 	}
-	*/
+	
 	return b.String()
 }
 
@@ -207,32 +207,14 @@ func (v *GenericFor) String() string {
 
 func (v *Phi) String() string {
 	var b strings.Builder
-	/*b.WriteString("phi [")
+	b.WriteString("φ(")
 	for i, edge := range v.Edges {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		// Be robust against malformed CFG.
-		if v.block == nil {
-			b.WriteString("??")
-			continue
-		}
-		block := -1
-		if i < len(v.block.Preds) {
-			block = v.block.Preds[i].Index
-		}
-		fmt.Fprintf(&b, "%d: ", block)
-		edgeVal := "<nil>" // be robust
-		//if edge != nil {
-			//edgeVal = relName(edge, v)
-		//}
-		b.WriteString(edgeVal)
+		b.WriteString(edge.String())
 	}
-	b.WriteString("]")
-	if v.Comment != "" {
-		b.WriteString(" #")
-		b.WriteString(v.Comment)
-	}*/
+	b.WriteString(")")
 	return b.String()
 }
 

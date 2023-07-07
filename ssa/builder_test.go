@@ -87,11 +87,22 @@ func TestBuild(t *testing.T) {
 
 func TestStuff(t *testing.T) {
 	const input = `
-	local x = 2
-	local x = x + 2
+	local t0 = 0
+
+	if global then
+		t0 = 1
+	end
+
+	print(t0+1)
 	`
 	fn := build(input, t)
+	buildReferrers(fn)
+	buildDomTree(fn)
+	BuildDomFrontier(fn)
+
+	lift(fn) 
 	b := &strings.Builder{}
 	WriteFunction(b, fn)
+	WriteCfgDot(b, fn)
 	t.Error("\n" + b.String())
 }
