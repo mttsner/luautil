@@ -175,8 +175,8 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 				}
 				writeChar(buf, sc.Next())
 			}
-			val, _ := strconv.ParseInt(buf.String(), 16, 64)
-			return float64(val), nil
+			val, err := strconv.ParseInt(buf.String(), 16, 64)
+			return float64(val), err
 		case 'b', 'B':
 			n := sc.Next()
 			if !isBinary(sc.Peek()) {
@@ -191,8 +191,8 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 				}
 				writeChar(buf, sc.Next())
 			}
-			val, _ := strconv.ParseInt(buf.String(), 2, 64)
-			return float64(val), nil
+			val, err := strconv.ParseInt(buf.String(), 2, 64)
+			return float64(val), err
 		case 'o', 'O':
 			n := sc.Next()
 			if !isOctal(sc.Peek()) {
@@ -207,8 +207,8 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 				}
 				writeChar(buf, sc.Next())
 			}
-			val, _ := strconv.ParseInt(buf.String(), 8, 64)
-			return float64(val), nil
+			val, err := strconv.ParseInt(buf.String(), 8, 64)
+			return float64(val), err
 		default:
 			if sc.Peek() != '.' && isDecimal(sc.Peek()) {
 				ch = sc.Next()
@@ -226,8 +226,7 @@ func (sc *Scanner) scanNumber(ch int, buf *bytes.Buffer) (float64, error) {
 		}
 		sc.scanDecimal(sc.Next(), buf)
 	}
-	val, _ := strconv.ParseInt(buf.String(), 10, 64)
-	return float64(val), nil
+	return strconv.ParseFloat(buf.String(), 64)
 }
 
 func (sc *Scanner) scanString(quote int, buf *bytes.Buffer) error {
